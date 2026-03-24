@@ -1,7 +1,11 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue'
+import InviteAgentPanel from '@/Components/InviteAgentPanel.vue'
+import { ref } from 'vue'
 
 defineProps({ agents: Array })
+
+const inviteOpen = ref(false)
 
 const providerColor = {
     anthropic: '#c084fc',
@@ -15,13 +19,33 @@ const providerColor = {
 <template>
     <AppLayout>
         <div class="space-y-5">
-            <h1 class="text-xl font-semibold" style="color: var(--color-text-primary);">Agent Map</h1>
 
+            <!-- Header -->
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-semibold" style="color: var(--color-text-primary);">Agent Map</h1>
+
+                <button @click="inviteOpen = !inviteOpen"
+                    class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                    :style="inviteOpen
+                        ? 'background-color: rgba(56,189,248,0.15); color: var(--color-accent); border: 1px solid rgba(56,189,248,0.3);'
+                        : 'background-color: var(--color-surface-elevated); color: var(--color-text-secondary); border: 1px solid var(--color-surface-border);'">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Invite Agent
+                </button>
+            </div>
+
+            <!-- Invite panel -->
+            <InviteAgentPanel v-if="inviteOpen" />
+
+            <!-- Empty state -->
             <div v-if="agents.length === 0" class="rounded-lg p-10 text-center text-sm"
                 style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); color: var(--color-text-muted);">
                 No agents registered yet.
             </div>
 
+            <!-- Table -->
             <div v-else class="rounded-lg overflow-hidden" style="border: 1px solid var(--color-surface-border);">
                 <table class="w-full text-sm">
                     <thead>
