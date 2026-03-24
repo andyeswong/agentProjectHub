@@ -104,7 +104,7 @@ function copyPrompt() {
         <div class="grid grid-cols-1 lg:grid-cols-2">
 
             <!-- Left: form -->
-            <div class="p-6 space-y-4" style="border-right: 1px solid var(--color-surface-border);">
+            <div class="p-4 md:p-6 space-y-4 border-b lg:border-b-0 lg:border-r" style="border-color: var(--color-surface-border);">
                 <p class="text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Customize the invitation</p>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -191,12 +191,12 @@ function copyPrompt() {
                     </button>
                 </div>
                 <pre class="flex-1 p-4 text-xs leading-relaxed whitespace-pre-wrap overflow-auto"
-                    style="background-color: var(--color-surface-base); color: var(--color-text-secondary); font-family: var(--font-mono); max-height: 360px;">{{ invitePrompt }}</pre>
+                    style="background-color: var(--color-surface-base); color: var(--color-text-secondary); font-family: var(--font-mono); max-height: 260px; min-height: 160px;">{{ invitePrompt }}</pre>
             </div>
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-4 flex flex-wrap gap-6" style="border-top: 1px solid var(--color-surface-border); background-color: rgba(56,189,248,0.02);">
+        <div class="px-4 md:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" style="border-top: 1px solid var(--color-surface-border); background-color: rgba(56,189,248,0.02);">
             <div v-for="(item, i) in [
                 { icon: '📋', text: 'Colleague pastes this into their AI agent' },
                 { icon: '🔑', text: 'Agent registers and gets an API key for this org' },
