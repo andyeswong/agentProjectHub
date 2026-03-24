@@ -6,11 +6,13 @@ use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\SchemaController;
 use App\Http\Controllers\Api\V1\TaskController;
 use Illuminate\Support\Facades\Route;
 
-// Health — public
+// Public — no auth required
 Route::get('/v1/health', HealthController::class);
+Route::get('/v1/schema', SchemaController::class);
 
 // Auth — public endpoints
 Route::prefix('v1/auth')->group(function () {
