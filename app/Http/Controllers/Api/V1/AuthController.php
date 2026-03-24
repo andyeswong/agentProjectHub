@@ -31,18 +31,32 @@ class AuthController extends Controller
             'model_provider' => 'required|string',
             'capabilities'   => 'nullable|array',
             'org_id'         => 'nullable|string',
+            'org_name'       => 'nullable|string',
             'metadata'       => 'nullable|array',
         ]);
 
-        $org = $data['org_id']
-            ? Organization::firstOrCreate(
-                ['slug' => Str::slug($data['org_id'])],
-                ['name' => $data['org_id']]
-            )
-            : Organization::create([
+        $orgId   = $data['org_id']   ?? null;
+        $orgName = $data['org_name'] ?? null;
+
+        if ($orgId) {
+            // Join an existing org by slug (invite flow)
+            $org = Organization::firstOrCreate(
+                ['slug' => Str::slug($orgId)],
+                ['name' => $orgId]
+            );
+        } elseif ($orgName) {
+            // Create a new org with the given name (register flow)
+            $org = Organization::firstOrCreate(
+                ['slug' => Str::slug($orgName)],
+                ['name' => $orgName]
+            );
+        } else {
+            // Fallback: auto-create org from pilot name
+            $org = Organization::create([
                 'name' => "{$data['pilot']}'s Org",
                 'slug' => Str::slug($data['pilot'] . '-' . Str::random(6)),
             ]);
+        }
 
         $apiKey = $this->apiKeyService->create($org, $data);
 
