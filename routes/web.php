@@ -4,9 +4,13 @@ use App\Http\Controllers\Web\AgentWebController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\PilotSessionController;
 use App\Http\Controllers\Web\ProjectWebController;
+use App\Http\Controllers\Web\PublicDashboardController;
 use App\Http\Controllers\Web\TaskWebController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+
+// Public org board — no auth
+Route::get('/board/{slug}', [PublicDashboardController::class, 'show'])->name('public.board');
 
 // Root redirect
 Route::get('/', fn() => redirect()->route(
