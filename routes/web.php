@@ -9,7 +9,8 @@ use App\Http\Controllers\Web\TaskWebController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// Public org board — no auth
+// Public boards — no auth
+Route::get('/board',        [PublicDashboardController::class, 'index'])->name('public.boards');
 Route::get('/board/{slug}', [PublicDashboardController::class, 'show'])->name('public.board');
 
 // Root redirect

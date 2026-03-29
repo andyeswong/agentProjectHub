@@ -5,11 +5,61 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\Task;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PublicDashboardController extends Controller
 {
+    public function index(): Response
+    {
+        $orgs = Organization::withCount([
+                'workspaces',
+                'apiKeys',
+            ])
+            ->with(['workspaces.projects' => function ($q) {
+                $q->where('status', 'active');
+            }])
+            ->orderBy('name')
+            ->get()
+            ->map(function ($org) {
+                $projectIds = $org->workspaces->flatMap(fn($w) => $w->projects->pluck('id'));
+
+                $taskStats = Task::whereIn('project_id', $projectIds)
+                    ->whereNull('archived_at')
+                    ->selectRaw("
+                        COUNT(*) as total,
+                        SUM(status = 'done') as done,
+                        SUM(status = 'blocked') as blocked,
+                        SUM(status != 'done') as open
+                    ")
+                    ->first();
+
+                return [
+                    'name'       => $org->name,
+                    'slug'       => $org->slug,
+                    'projects'   => $projectIds->count(),
+                    'agents'     => $org->api_keys_count,
+                    'task_stats' => [
+                        'total'   => (int) ($taskStats->total   ?? 0),
+                        'done'    => (int) ($taskStats->done    ?? 0),
+                        'open'    => (int) ($taskStats->open    ?? 0),
+                        'blocked' => (int) ($taskStats->blocked ?? 0),
+                    ],
+                ];
+            });
+
+        return Inertia::render('Public/BoardIndex', [
+            'orgs'  => $orgs,
+            'total' => [
+                'orgs'  => $orgs->count(),
+                'tasks' => $orgs->sum(fn($o) => $o['task_stats']['total']),
+                'open'  => $orgs->sum(fn($o) => $o['task_stats']['open']),
+                'done'  => $orgs->sum(fn($o) => $o['task_stats']['done']),
+            ],
+        ]);
+    }
+
     public function show(string $slug): Response
     {
         $org = Organization::where('slug', $slug)->firstOrFail();
