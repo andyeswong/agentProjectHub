@@ -49,6 +49,8 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::post('/projects/{id}/tasks/batch',                     [TaskController::class, 'batch']);
         Route::get('/tasks/{id}',                                     [TaskController::class, 'show']);
         Route::patch('/tasks/{id}',                                   [TaskController::class, 'update']);
+        Route::post('/tasks/{id}/archive',                            [TaskController::class, 'archive']);
+        Route::post('/tasks/{id}/unarchive',                          [TaskController::class, 'unarchive']);
 
         // Comments
         Route::post('/tasks/{id}/comments',                           [CommentController::class, 'store']);

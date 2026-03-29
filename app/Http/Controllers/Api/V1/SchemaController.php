@@ -239,7 +239,7 @@ class SchemaController extends Controller
                     'method'  => 'PATCH',
                     'path'    => '/api/v1/tasks/{id}',
                     'auth'    => true,
-                    'summary' => 'Update task fields. Status changes are automatically recorded in the event log.',
+                    'summary' => 'Update task fields. Pass project_id to move the task to a different project within the same org. Status changes are automatically recorded in the event log.',
                     'path_params' => ['id' => 'Task UUID'],
                     'body'    => [
                         'title'           => ['type' => 'string',  'required' => false],
@@ -250,7 +250,34 @@ class SchemaController extends Controller
                         'due_date'        => ['type' => 'string',  'required' => false],
                         'estimated_hours' => ['type' => 'number',  'required' => false],
                         'tags'            => ['type' => 'array',   'required' => false],
+                        'project_id'      => ['type' => 'string',  'required' => false, 'description' => 'UUID of the destination project (must belong to the same org). Moves the task and emits a task.moved event.'],
                     ],
+                ],
+
+                [
+                    'method'  => 'POST',
+                    'path'    => '/api/v1/tasks/{id}/archive',
+                    'auth'    => true,
+                    'summary' => 'Soft-delete (archive) a task. Archived tasks are hidden from default task lists. If a reason is provided it is automatically saved as a comment in the task timeline. Emits task.archived event.',
+                    'path_params' => ['id' => 'Task UUID'],
+                    'body'    => [
+                        'reason' => ['type' => 'string', 'required' => false, 'description' => 'Human-readable reason for archiving. Stored as a comment on the task.'],
+                    ],
+                    'response_example' => [
+                        'status'      => 'archived',
+                        'task_id'     => 'uuid',
+                        'archived_at' => '2026-03-29T21:20:00Z',
+                        'reason'      => 'No longer relevant after scope change.',
+                    ],
+                    'note' => 'Archived tasks are excluded from GET /projects/{id}/tasks by default. Pass ?include_archived=true to include them.',
+                ],
+
+                [
+                    'method'  => 'POST',
+                    'path'    => '/api/v1/tasks/{id}/unarchive',
+                    'auth'    => true,
+                    'summary' => 'Restore an archived task. Clears archived_at, archived_by, and archive_reason. Emits task.unarchived event.',
+                    'path_params' => ['id' => 'Task UUID'],
                 ],
 
                 // ── Comments ─────────────────────────────────────────────
@@ -286,6 +313,9 @@ class SchemaController extends Controller
                         'task.status_changed',
                         'task.blocked',
                         'task.commented',
+                        'task.moved',
+                        'task.archived',
+                        'task.unarchived',
                         'pilot.login',
                     ],
                 ],

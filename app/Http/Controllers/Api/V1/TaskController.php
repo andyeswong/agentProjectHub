@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityEvent;
+use App\Models\Comment;
 use App\Models\Project;
 use App\Models\Task;
 use App\Services\ActivityEventService;
@@ -23,6 +24,11 @@ class TaskController extends Controller
             ->findOrFail($projectId);
 
         $query = $project->tasks()->with(['assignee', 'creator']);
+
+        // Exclude archived tasks by default; pass ?include_archived=true to show them
+        if (!$request->boolean('include_archived')) {
+            $query->whereNull('archived_at');
+        }
 
         // status filter: supports "open" as shorthand
         if ($request->filled('status')) {
@@ -195,7 +201,33 @@ class TaskController extends Controller
             'start_date'      => 'sometimes|nullable|date',
             'estimated_hours' => 'sometimes|nullable|numeric|min:0',
             'tags'            => 'sometimes|nullable|array',
+            'project_id'      => 'sometimes|uuid|exists:projects,id',
         ]);
+
+        // ── Move to another project ───────────────────────────────────────
+        if (isset($data['project_id']) && $data['project_id'] !== $task->project_id) {
+            $destination = Project::whereHas('workspace', fn($q) => $q->where('org_id', $apiKey->org_id))
+                ->find($data['project_id']);
+
+            if (!$destination) {
+                return response()->json(['error' => 'Destination project not found or not in your organization.'], 404);
+            }
+
+            $fromProject = $task->project_id;
+            $task->update(['project_id' => $data['project_id']]);
+            unset($data['project_id']);
+
+            $this->events->record('task.moved', 'task', $task->id, $apiKey, [
+                'from_project_id' => $fromProject,
+                'to_project_id'   => $destination->id,
+                'to_project_name' => $destination->name,
+            ], $request->ip());
+
+            // If only moving (no other fields), return early
+            if (empty($data)) {
+                return response()->json($task->fresh(['assignee', 'creator', 'project']));
+            }
+        }
 
         $oldStatus = $task->status;
         $task->update($data);
@@ -210,7 +242,76 @@ class TaskController extends Controller
 
         $this->events->record($eventType, 'task', $task->id, $apiKey, $payload, $request->ip());
 
-        return response()->json($task->fresh(['assignee', 'creator']));
+        return response()->json($task->fresh(['assignee', 'creator', 'project']));
+    }
+
+    // POST /api/v1/tasks/:id/archive
+    public function archive(Request $request, string $id): JsonResponse
+    {
+        $apiKey = $request->attributes->get('api_key');
+
+        $task = Task::whereHas('project.workspace', fn($q) => $q->where('org_id', $apiKey->org_id))
+            ->findOrFail($id);
+
+        if ($task->isArchived()) {
+            return response()->json(['error' => 'Task is already archived.'], 409);
+        }
+
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:1000',
+        ]);
+
+        $reason = $data['reason'] ?? null;
+
+        $task->update([
+            'archived_at'    => now(),
+            'archived_by'    => $apiKey->id,
+            'archive_reason' => $reason,
+        ]);
+
+        // Auto-create a comment so the reason is visible in the task timeline
+        if ($reason) {
+            Comment::create([
+                'task_id'          => $task->id,
+                'actor_api_key_id' => $apiKey->id,
+                'text'             => "[archived] {$reason}",
+                'type'             => 'general',
+            ]);
+        }
+
+        $this->events->record('task.archived', 'task', $task->id, $apiKey, [
+            'reason' => $reason,
+        ], $request->ip());
+
+        return response()->json([
+            'status'      => 'archived',
+            'task_id'     => $task->id,
+            'archived_at' => $task->archived_at,
+            'reason'      => $reason,
+        ]);
+    }
+
+    // POST /api/v1/tasks/:id/unarchive
+    public function unarchive(Request $request, string $id): JsonResponse
+    {
+        $apiKey = $request->attributes->get('api_key');
+
+        $task = Task::whereHas('project.workspace', fn($q) => $q->where('org_id', $apiKey->org_id))
+            ->findOrFail($id);
+
+        if (!$task->isArchived()) {
+            return response()->json(['error' => 'Task is not archived.'], 409);
+        }
+
+        $task->update([
+            'archived_at'    => null,
+            'archived_by'    => null,
+            'archive_reason' => null,
+        ]);
+
+        $this->events->record('task.unarchived', 'task', $task->id, $apiKey, [], $request->ip());
+
+        return response()->json($task->fresh(['assignee', 'creator', 'project']));
     }
 
     public function destroy(string $id): JsonResponse

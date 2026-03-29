@@ -15,14 +15,27 @@ class Task extends Model
         'project_id', 'created_by', 'assignee_id',
         'title', 'description', 'status', 'priority',
         'due_date', 'start_date', 'estimated_hours', 'tags',
+        'archived_at', 'archived_by', 'archive_reason',
     ];
 
     protected $casts = [
-        'tags'             => 'array',
-        'due_date'         => 'date',
-        'start_date'       => 'date',
-        'estimated_hours'  => 'float',
+        'tags'            => 'array',
+        'due_date'        => 'date',
+        'start_date'      => 'date',
+        'estimated_hours' => 'float',
+        'archived_at'     => 'datetime',
     ];
+
+    // Default scope: exclude archived tasks unless explicitly requested
+    public function scopeActive($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
+    }
 
     public function project(): BelongsTo
     {

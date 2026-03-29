@@ -65,6 +65,8 @@ class AuthController extends Controller
             'client_type' => $apiKey->client_type,
         ], $request->ip());
 
+        $baseUrl = url('/api/v1');
+
         return response()->json([
             'status'        => 'registered',
             'api_key'       => $apiKey->key,
@@ -72,6 +74,87 @@ class AuthController extends Controller
             'permissions'   => $apiKey->permissions,
             'rate_limit'    => $apiKey->rate_limit,
             'registered_at' => $apiKey->created_at,
+
+            // ── Agent onboarding instructions ────────────────────────────
+            'agent_instructions' => [
+                'authentication' => [
+                    'description' => 'Include your api_key in every subsequent request as a Bearer token.',
+                    'header'      => 'Authorization: Bearer ' . $apiKey->key,
+                ],
+                'next_steps' => [
+                    [
+                        'step'        => 1,
+                        'action'      => 'Create a workspace',
+                        'method'      => 'POST',
+                        'endpoint'    => "{$baseUrl}/organizations/{$org->slug}/workspaces",
+                        'body'        => ['name' => 'My Workspace'],
+                        'description' => 'A workspace groups related projects. Save the returned workspace id.',
+                    ],
+                    [
+                        'step'        => 2,
+                        'action'      => 'Create a project',
+                        'method'      => 'POST',
+                        'endpoint'    => "{$baseUrl}/projects",
+                        'body'        => ['workspace_id' => '<workspace_id from step 1>', 'name' => 'My Project'],
+                        'description' => 'Projects hold tasks. Save the returned project id.',
+                    ],
+                    [
+                        'step'        => 3,
+                        'action'      => 'Create tasks',
+                        'method'      => 'POST',
+                        'endpoint'    => "{$baseUrl}/projects/<project_id>/tasks/batch",
+                        'body'        => ['tasks' => [['title' => 'First task', 'status' => 'todo', 'priority' => 'medium']]],
+                        'description' => 'Use batch to create multiple tasks at once (max 50). Or POST /projects/<id>/tasks for a single task.',
+                    ],
+                    [
+                        'step'        => 4,
+                        'action'      => 'Poll for events',
+                        'method'      => 'GET',
+                        'endpoint'    => "{$baseUrl}/events?since=<ISO8601_timestamp>",
+                        'description' => 'Poll this endpoint periodically to stay in sync with all changes made by humans or other agents. Store the latest event timestamp and use it as the ?since= value on the next poll.',
+                    ],
+                    [
+                        'step'        => 5,
+                        'action'      => 'Give your human pilot dashboard access (optional)',
+                        'method'      => 'POST',
+                        'endpoint'    => "{$baseUrl}/auth/pilot-token",
+                        'description' => 'Call this with your API key to get a one-time pilot_token (valid 15 min). Share it with your human operator so they can log into the dashboard at ' . url('/login') . '.',
+                    ],
+                ],
+                'tool_registration' => [
+                    'description'   => 'To register ProjectHub as a callable tool in your system prompt or tool definition, use the following template.',
+                    'system_prompt_snippet' => implode("\n", [
+                        'You have access to ProjectHub LLM, a project management system.',
+                        'Base URL: ' . $baseUrl,
+                        'Auth header: Authorization: Bearer ' . $apiKey->key,
+                        'Your org_id: ' . $org->slug,
+                        '',
+                        'Key operations:',
+                        '  - List projects:        GET   ' . $baseUrl . '/projects',
+                        '  - Create project:       POST  ' . $baseUrl . '/projects',
+                        '  - List tasks:           GET   ' . $baseUrl . '/projects/{project_id}/tasks',
+                        '  - List + archived:      GET   ' . $baseUrl . '/projects/{project_id}/tasks?include_archived=true',
+                        '  - Create tasks (batch): POST  ' . $baseUrl . '/projects/{project_id}/tasks/batch',
+                        '  - Update task:          PATCH ' . $baseUrl . '/tasks/{task_id}   body: {"status":"in_progress|done|blocked", ...}',
+                        '  - Move task to project: PATCH ' . $baseUrl . '/tasks/{task_id}   body: {"project_id":"<destination_project_uuid>"}',
+                        '  - Archive task:         POST  ' . $baseUrl . '/tasks/{task_id}/archive   body: {"reason":"optional reason"}',
+                        '  - Unarchive task:       POST  ' . $baseUrl . '/tasks/{task_id}/unarchive',
+                        '  - Add comment:          POST  ' . $baseUrl . '/tasks/{task_id}/comments',
+                        '  - Poll events:          GET   ' . $baseUrl . '/events?since={ISO8601}',
+                        '  - Full schema:          GET   ' . $baseUrl . '/schema',
+                    ]),
+                    'tool_definition_example' => [
+                        'name'        => 'project_hub',
+                        'description' => 'Manage projects and tasks in ProjectHub. Use this tool to create, list, and update projects and tasks, post comments, and poll for activity events.',
+                        'parameters'  => [
+                            'method'   => ['type' => 'string', 'enum' => ['GET', 'POST', 'PATCH']],
+                            'endpoint' => ['type' => 'string', 'description' => 'Full URL, e.g. ' . $baseUrl . '/projects'],
+                            'body'     => ['type' => 'object', 'description' => 'Request body for POST/PATCH (optional for GET)'],
+                        ],
+                    ],
+                ],
+                'schema_url' => "{$baseUrl}/schema",
+            ],
         ], 201);
     }
 
