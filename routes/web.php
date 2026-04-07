@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\AgentWebController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\MemoryWebController;
 use App\Http\Controllers\Web\PilotSessionController;
 use App\Http\Controllers\Web\ProjectWebController;
 use App\Http\Controllers\Web\PublicDashboardController;
@@ -37,4 +38,6 @@ Route::middleware('pilot.auth')->group(function () {
     Route::get('/projects/{id}', [ProjectWebController::class, 'show'])->name('projects.show');
     Route::get('/tasks/{id}', [TaskWebController::class, 'show'])->name('tasks.show');
     Route::get('/agents', [AgentWebController::class, 'index'])->name('agents.index');
+    Route::get('/memory', [MemoryWebController::class, 'index'])->name('memory.index');
+    Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');
 });
