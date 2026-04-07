@@ -54,26 +54,31 @@ class AgentMemory extends Model
     }
 
     /**
-     * Return the memory without the raw embedding vector (too large for lists)
-     * and with the value masked if sensitive.
+     * Return the memory safe for public/list responses.
+     * Sensitive memories have both `value` and `content` redacted.
+     * Pass revealSensitive=true only from authenticated reveal endpoints.
      */
     public function toPublicArray(bool $revealSensitive = false): array
     {
         $data = $this->toArray();
         unset($data['embedding']); // Never expose raw vector in responses
 
-        if ($this->is_sensitive && !$revealSensitive && isset($data['value'])) {
-            $data['value'] = $this->maskSensitiveValue($data['value']);
+        if ($this->is_sensitive && !$revealSensitive) {
+            // Redact value — replace each field's value with asterisks
+            if (isset($data['value']) && is_array($data['value'])) {
+                $data['value'] = array_map(
+                    fn($v) => is_string($v) ? str_repeat('*', min(strlen($v), 8)) : '***',
+                    $data['value']
+                );
+            }
+
+            // Redact content — may contain raw secrets the agent described
+            $data['content'] = '[sensitive — click Reveal to view]';
         }
 
         $data['is_embedded'] = $this->isEmbedded();
         $data['is_expired']  = $this->isExpired();
 
         return $data;
-    }
-
-    private function maskSensitiveValue(array $value): array
-    {
-        return array_map(fn($v) => is_string($v) ? str_repeat('*', min(strlen($v), 8)) : '***', $value);
     }
 }

@@ -279,7 +279,12 @@ const types = ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other']
                             </div>
 
                             <!-- Content -->
-                            <p class="text-xs mb-2 line-clamp-2" style="color: var(--color-text-secondary);">{{ memory.content }}</p>
+                            <p v-if="memory.is_sensitive"
+                                class="text-xs mb-2 italic"
+                                style="color: var(--color-text-muted);">
+                                🔒 sensitive — click Reveal to view
+                            </p>
+                            <p v-else class="text-xs mb-2 line-clamp-2" style="color: var(--color-text-secondary);">{{ memory.content }}</p>
 
                             <!-- Value preview -->
                             <div v-if="memory.value" class="mb-2">
