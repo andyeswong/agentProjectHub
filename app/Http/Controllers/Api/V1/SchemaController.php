@@ -293,6 +293,115 @@ class SchemaController extends Controller
                     ],
                 ],
 
+                // ── Shared Agent Memory ──────────────────────────────────
+                [
+                    'method'  => 'GET',
+                    'path'    => '/api/v1/memory',
+                    'auth'    => true,
+                    'summary' => 'List all non-expired memories shared in the agent\'s workspace. Any agent in the same workspace can read these, regardless of model.',
+                    'query_params' => [
+                        'type'      => ['type' => 'string', 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other'], 'description' => 'Filter by type. Comma-separated for multiple.'],
+                        'tags'      => ['type' => 'string', 'description' => 'Comma-separated tags to filter by'],
+                        'key'       => ['type' => 'string', 'description' => 'Retrieve a specific named memory by key'],
+                        'sensitive' => ['type' => 'boolean', 'description' => 'Filter by sensitivity flag'],
+                        'q'         => ['type' => 'string', 'description' => 'Keyword search on label, content, or key'],
+                        'limit'     => ['type' => 'integer', 'default' => 50],
+                    ],
+                    'note' => 'Sensitive memories have their value masked in this response. Use GET /memory/{id} to retrieve the full unmasked value.',
+                ],
+
+                [
+                    'method'  => 'POST',
+                    'path'    => '/api/v1/memory',
+                    'auth'    => true,
+                    'summary' => 'Store a new shared memory. Content is automatically embedded via mxbai-embed-large:latest (Ollama) and made available for semantic search.',
+                    'body'    => [
+                        'label'        => ['type' => 'string',  'required' => true,  'example' => 'Production DB password'],
+                        'content'      => ['type' => 'string',  'required' => true,  'description' => 'Text used for embedding and semantic search. Describe what this memory is.'],
+                        'type'         => ['type' => 'string',  'required' => false, 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other'], 'default' => 'fact'],
+                        'key'          => ['type' => 'string',  'required' => false, 'description' => 'Optional named key for direct retrieval. Must be unique within the workspace.'],
+                        'value'        => ['type' => 'object',  'required' => false, 'description' => 'Structured data (e.g. {username, password, host} for credentials)'],
+                        'tags'         => ['type' => 'array',   'required' => false, 'example' => ['prod', 'mysql']],
+                        'is_sensitive' => ['type' => 'boolean', 'required' => false, 'default' => false, 'description' => 'If true, value is masked in list/search responses.'],
+                        'expires_at'   => ['type' => 'string',  'required' => false, 'description' => 'ISO 8601 datetime. Memory is excluded from search/list after this point.'],
+                    ],
+                    'response_example' => [
+                        'status' => 'stored',
+                        'memory' => ['id' => 'uuid', 'label' => 'Production DB password', 'type' => 'credential', 'is_embedded' => true],
+                        '_meta'  => ['embedded' => true, 'embed_model' => 'mxbai-embed-large:latest'],
+                    ],
+                ],
+
+                [
+                    'method'  => 'POST',
+                    'path'    => '/api/v1/memory/search',
+                    'auth'    => true,
+                    'summary' => 'Semantic vector search across the workspace\'s shared memories using mxbai-embed-large:latest. Falls back to keyword search if Ollama is unreachable.',
+                    'body'    => [
+                        'q'     => ['type' => 'string',  'required' => true,  'example' => 'database password production'],
+                        'limit' => ['type' => 'integer', 'required' => false, 'default' => 10, 'max' => 50],
+                    ],
+                    'response_example' => [
+                        'query'   => 'database password production',
+                        'mode'    => 'semantic',
+                        'results' => [
+                            ['memory' => ['id' => 'uuid', 'label' => 'Production DB password'], 'score' => 0.94, 'rank' => 1],
+                        ],
+                        '_meta'   => ['embed_model' => 'mxbai-embed-large:latest', 'total_searched' => 14],
+                    ],
+                    'note' => 'Score ranges 0.0–1.0. Score ≥ 0.75 is a strong semantic match. Results sorted by score descending.',
+                ],
+
+                [
+                    'method'  => 'PUT',
+                    'path'    => '/api/v1/memory/key/{key}',
+                    'auth'    => true,
+                    'summary' => 'Upsert a memory by named key. Creates if not found, updates if exists. Re-embeds automatically when content changes. Ideal for agents that maintain named persistent memory slots.',
+                    'path_params' => ['key' => 'Named memory key (e.g. prod-db-password, main-domain)'],
+                    'body'    => [
+                        'label'        => ['type' => 'string',  'required' => false],
+                        'content'      => ['type' => 'string',  'required' => false],
+                        'type'         => ['type' => 'string',  'required' => false, 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other']],
+                        'value'        => ['type' => 'object',  'required' => false],
+                        'tags'         => ['type' => 'array',   'required' => false],
+                        'is_sensitive' => ['type' => 'boolean', 'required' => false],
+                        'expires_at'   => ['type' => 'string',  'required' => false],
+                    ],
+                ],
+
+                [
+                    'method'  => 'GET',
+                    'path'    => '/api/v1/memory/{id}',
+                    'auth'    => true,
+                    'summary' => 'Get a single memory with full unmasked value. Use this to retrieve sensitive data like passwords or tokens.',
+                    'path_params' => ['id' => 'Memory UUID'],
+                ],
+
+                [
+                    'method'  => 'PUT',
+                    'path'    => '/api/v1/memory/{id}',
+                    'auth'    => true,
+                    'summary' => 'Update a memory by ID. Re-embeds automatically if content changes.',
+                    'path_params' => ['id' => 'Memory UUID'],
+                    'body'    => [
+                        'label'        => ['type' => 'string',  'required' => false],
+                        'content'      => ['type' => 'string',  'required' => false],
+                        'type'         => ['type' => 'string',  'required' => false],
+                        'value'        => ['type' => 'object',  'required' => false],
+                        'tags'         => ['type' => 'array',   'required' => false],
+                        'is_sensitive' => ['type' => 'boolean', 'required' => false],
+                        'expires_at'   => ['type' => 'string',  'required' => false],
+                    ],
+                ],
+
+                [
+                    'method'  => 'DELETE',
+                    'path'    => '/api/v1/memory/{id}',
+                    'auth'    => true,
+                    'summary' => 'Permanently delete a memory. Emits memory.deleted event.',
+                    'path_params' => ['id' => 'Memory UUID'],
+                ],
+
                 // ── Events ───────────────────────────────────────────────
                 [
                     'method'  => 'GET',
@@ -317,6 +426,9 @@ class SchemaController extends Controller
                         'task.archived',
                         'task.unarchived',
                         'pilot.login',
+                        'memory.stored',
+                        'memory.updated',
+                        'memory.deleted',
                     ],
                 ],
             ],
@@ -327,6 +439,7 @@ class SchemaController extends Controller
                 'project_status'   => ['active', 'archived'],
                 'comment_type'     => ['instruction', 'correction', 'question', 'approval', 'general'],
                 'model_provider'   => ['anthropic', 'openai', 'ollama', 'gemini', 'custom'],
+                'memory_type'      => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other'],
             ],
 
             'error_format' => [
