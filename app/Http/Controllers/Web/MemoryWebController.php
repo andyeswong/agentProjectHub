@@ -39,10 +39,10 @@ class MemoryWebController extends Controller
             $mode   = $result['embedded'] ? 'semantic' : 'keyword_fallback';
             $embedded = $result['embedded'];
 
-            $memories = $result['results']->map(fn($r) => [
+            $memories = $result['results']->map(fn($r, $i) => [
                 ...$r['memory']->toPublicArray(),
                 '_score' => $r['score'],
-                '_rank'  => $r['rank'],
+                '_rank'  => $i + 1,
             ]);
         } elseif ($workspace) {
             $query = AgentMemory::where('workspace_id', $workspace->id)
