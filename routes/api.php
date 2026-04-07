@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CommentController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\MemoryController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\SchemaController;
@@ -57,5 +58,14 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
 
         // Events
         Route::get('/events',                                         [EventController::class, 'index']);
+
+        // Shared Agent Memory (vector search via mxbai-embed-large @ Ollama)
+        Route::get('/memory',                                         [MemoryController::class, 'index']);
+        Route::post('/memory',                                        [MemoryController::class, 'store']);
+        Route::post('/memory/search',                                 [MemoryController::class, 'search']);
+        Route::put('/memory/key/{key}',                               [MemoryController::class, 'upsertByKey']);
+        Route::get('/memory/{id}',                                    [MemoryController::class, 'show']);
+        Route::put('/memory/{id}',                                    [MemoryController::class, 'update']);
+        Route::delete('/memory/{id}',                                 [MemoryController::class, 'destroy']);
     });
 });

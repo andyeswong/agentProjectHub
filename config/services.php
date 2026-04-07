@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'ollama' => [
+        'host'            => env('OLLAMA_HOST', 'https://ollama.andres-wong.com'),
+        'embed_model'     => env('OLLAMA_EMBED_MODEL', 'mxbai-embed-large:latest'),
+        'timeout'         => env('OLLAMA_TIMEOUT', 30),
+    ],
+
 ];

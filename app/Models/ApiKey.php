@@ -52,6 +52,11 @@ class ApiKey extends Model
         return $this->hasMany(ActivityEvent::class, 'actor_api_key_id');
     }
 
+    public function memories(): HasMany
+    {
+        return $this->hasMany(\App\Models\AgentMemory::class, 'created_by');
+    }
+
     public function isRevoked(): bool
     {
         return $this->revoked_at !== null;
