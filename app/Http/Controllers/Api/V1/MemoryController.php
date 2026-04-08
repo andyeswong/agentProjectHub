@@ -101,7 +101,7 @@ class MemoryController extends Controller
 
         $data = $request->validate([
             'key'          => 'nullable|string|max:255',
-            'type'         => 'nullable|in:credential,domain,ip,fact,config,note,other',
+            'type'         => 'nullable|in:credential,domain,ip,fact,config,note,skill,other',
             'label'        => 'required|string|max:255',
             'content'      => 'required|string',
             'value'        => 'nullable|array',
@@ -202,7 +202,7 @@ class MemoryController extends Controller
         $mem = AgentMemory::where('workspace_id', $workspace->id)->findOrFail($id);
 
         $data = $request->validate([
-            'type'         => 'sometimes|in:credential,domain,ip,fact,config,note,other',
+            'type'         => 'sometimes|in:credential,domain,ip,fact,config,note,skill,other',
             'label'        => 'sometimes|string|max:255',
             'content'      => 'sometimes|string',
             'value'        => 'sometimes|nullable|array',
@@ -255,7 +255,7 @@ class MemoryController extends Controller
         }
 
         $data = $request->validate([
-            'type'         => 'nullable|in:credential,domain,ip,fact,config,note,other',
+            'type'         => 'nullable|in:credential,domain,ip,fact,config,note,skill,other',
             'label'        => 'sometimes|string|max:255',
             'content'      => 'sometimes|string',
             'value'        => 'nullable|array',

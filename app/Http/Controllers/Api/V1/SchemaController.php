@@ -300,7 +300,7 @@ class SchemaController extends Controller
                     'auth'    => true,
                     'summary' => 'List all non-expired memories shared in the agent\'s workspace. Any agent in the same workspace can read these, regardless of model.',
                     'query_params' => [
-                        'type'      => ['type' => 'string', 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other'], 'description' => 'Filter by type. Comma-separated for multiple.'],
+                        'type'      => ['type' => 'string', 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'skill', 'other'], 'description' => 'Filter by type. Comma-separated for multiple.'],
                         'tags'      => ['type' => 'string', 'description' => 'Comma-separated tags to filter by'],
                         'key'       => ['type' => 'string', 'description' => 'Retrieve a specific named memory by key'],
                         'sensitive' => ['type' => 'boolean', 'description' => 'Filter by sensitivity flag'],
@@ -318,7 +318,7 @@ class SchemaController extends Controller
                     'body'    => [
                         'label'        => ['type' => 'string',  'required' => true,  'example' => 'Production DB password'],
                         'content'      => ['type' => 'string',  'required' => true,  'description' => 'Text used for embedding and semantic search. Describe what this memory is.'],
-                        'type'         => ['type' => 'string',  'required' => false, 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other'], 'default' => 'fact'],
+                        'type'         => ['type' => 'string',  'required' => false, 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'skill', 'other'], 'default' => 'fact'],
                         'key'          => ['type' => 'string',  'required' => false, 'description' => 'Optional named key for direct retrieval. Must be unique within the workspace.'],
                         'value'        => ['type' => 'object',  'required' => false, 'description' => 'Structured data (e.g. {username, password, host} for credentials)'],
                         'tags'         => ['type' => 'array',   'required' => false, 'example' => ['prod', 'mysql']],
@@ -361,7 +361,7 @@ class SchemaController extends Controller
                     'body'    => [
                         'label'        => ['type' => 'string',  'required' => false],
                         'content'      => ['type' => 'string',  'required' => false],
-                        'type'         => ['type' => 'string',  'required' => false, 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other']],
+                        'type'         => ['type' => 'string',  'required' => false, 'enum' => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'skill', 'other']],
                         'value'        => ['type' => 'object',  'required' => false],
                         'tags'         => ['type' => 'array',   'required' => false],
                         'is_sensitive' => ['type' => 'boolean', 'required' => false],
@@ -439,7 +439,7 @@ class SchemaController extends Controller
                 'project_status'   => ['active', 'archived'],
                 'comment_type'     => ['instruction', 'correction', 'question', 'approval', 'general'],
                 'model_provider'   => ['anthropic', 'openai', 'ollama', 'gemini', 'custom'],
-                'memory_type'      => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'other'],
+                'memory_type'      => ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'skill', 'other'],
             ],
 
             'error_format' => [
