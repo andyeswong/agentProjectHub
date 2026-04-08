@@ -8,6 +8,7 @@ use App\Models\Workspace;
 use App\Services\ActivityEventService;
 use App\Services\EmbeddingService;
 use App\Services\MemoryService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -241,7 +242,39 @@ class MemoryController extends Controller
         }
 
         $data['last_updated_by'] = $apiKey->id;
-        $mem->update($data);
+
+        try {
+            $mem->update($data);
+        } catch (UniqueConstraintViolationException) {
+            // A memory with the same memory_key already exists in the target workspace
+            $conflicting = AgentMemory::where('workspace_id', $data['workspace_id'] ?? $mem->workspace_id)
+                ->where('memory_key', $mem->memory_key)
+                ->where('id', '!=', $mem->id)
+                ->first();
+
+            return response()->json([
+                'error'      => "Cannot move memory: key \"{$mem->memory_key}\" already exists in the destination workspace.",
+                'code'       => 'memory_key_conflict',
+                'memory_key' => $mem->memory_key,
+                'conflicting_memory' => $conflicting ? $conflicting->toPublicArray() : null,
+                'hint'       => 'To resolve: (1) Delete the conflicting memory in the destination first, then retry the move. '
+                              . '(2) Or clear the key on this memory first (PATCH with memory_key: null), then move it.',
+                'resolution_options' => [
+                    [
+                        'option'   => 'delete_conflicting',
+                        'action'   => 'Delete the existing memory in the destination, then retry',
+                        'method'   => 'DELETE',
+                        'endpoint' => $conflicting ? "/api/v1/memory/{$conflicting->id}" : null,
+                    ],
+                    [
+                        'option'   => 'clear_key_then_move',
+                        'action'   => 'Remove the key from this memory, then move it',
+                        'step_1'   => ['method' => 'PUT', 'endpoint' => "/api/v1/memory/{$mem->id}", 'body' => ['memory_key' => null]],
+                        'step_2'   => ['method' => 'PUT', 'endpoint' => "/api/v1/memory/{$mem->id}", 'body' => ['workspace_id' => $data['workspace_id'] ?? null]],
+                    ],
+                ],
+            ], 409);
+        }
 
         $this->events->record('memory.updated', 'memory', $mem->id, $apiKey, [
             'label'           => $mem->label,
@@ -249,13 +282,15 @@ class MemoryController extends Controller
             're_embedded'     => $contentChanged && isset($embedding) && $embedding !== null,
         ]);
 
+        $fresh = $mem->fresh(['creator', 'lastEditor']);
+
         return response()->json([
             'status' => 'updated',
-            'memory' => $mem->fresh(['creator', 'lastEditor'])->toPublicArray(),
+            'memory' => $fresh->toPublicArray(),
             '_meta'  => [
                 'content_changed' => $contentChanged,
                 're_embedded'     => $contentChanged && !empty($data['embedding']),
-                'embed_model'     => $mem->fresh()->embedding_model,
+                'embed_model'     => $fresh->embedding_model,
             ],
         ]);
     }
