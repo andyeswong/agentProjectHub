@@ -206,6 +206,7 @@ class MemoryController extends Controller
         $mem = AgentMemory::whereIn('workspace_id', $workspaceIds)->findOrFail($id);
 
         $data = $request->validate([
+            'workspace_id' => 'sometimes|uuid',
             'type'         => 'sometimes|in:credential,domain,ip,fact,config,note,skill,other',
             'label'        => 'sometimes|string|max:255',
             'content'      => 'sometimes|string',
@@ -215,6 +216,20 @@ class MemoryController extends Controller
             'is_sensitive' => 'sometimes|boolean',
             'expires_at'   => 'sometimes|nullable|date',
         ]);
+
+        // Validate workspace_id belongs to the same org
+        if (!empty($data['workspace_id'])) {
+            $targetWorkspace = Workspace::where('id', $data['workspace_id'])
+                ->where('org_id', $apiKey->org_id)
+                ->first();
+
+            if (!$targetWorkspace) {
+                return response()->json([
+                    'error' => 'workspace_id does not belong to your organization.',
+                    'code'  => 'invalid_workspace',
+                ], 422);
+            }
+        }
 
         $contentChanged = isset($data['content']) && $data['content'] !== $mem->content;
 
