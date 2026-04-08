@@ -73,14 +73,21 @@ class MemoryWebController extends Controller
                 ->map(fn($m) => $m->toPublicArray());
         }
 
+        // Per-workspace memory counts for the tab badges
+        $countsByWorkspace = AgentMemory::whereIn('workspace_id', $allIds)
+            ->selectRaw('workspace_id, count(*) as count')
+            ->groupBy('workspace_id')
+            ->pluck('count', 'workspace_id');
+
+        // Stats reflect the current filter scope (all or one workspace)
         $stats = [
-            'total'     => AgentMemory::whereIn('workspace_id', $allIds)->count(),
-            'by_type'   => AgentMemory::whereIn('workspace_id', $allIds)
+            'total'     => AgentMemory::whereIn('workspace_id', $targetIds)->count(),
+            'by_type'   => AgentMemory::whereIn('workspace_id', $targetIds)
                             ->selectRaw('type, count(*) as count')
                             ->groupBy('type')
                             ->pluck('count', 'type'),
-            'sensitive' => AgentMemory::whereIn('workspace_id', $allIds)->where('is_sensitive', true)->count(),
-            'embedded'  => AgentMemory::whereIn('workspace_id', $allIds)->whereNotNull('embedding')->count(),
+            'sensitive' => AgentMemory::whereIn('workspace_id', $targetIds)->where('is_sensitive', true)->count(),
+            'embedded'  => AgentMemory::whereIn('workspace_id', $targetIds)->whereNotNull('embedding')->count(),
         ];
 
         return Inertia::render('Memory/Index', [
@@ -89,7 +96,12 @@ class MemoryWebController extends Controller
             'filters'             => ['q' => $q, 'type' => $type, 'semantic' => $semantic, 'workspace_id' => $filterWorkspaceId],
             'search_mode'         => $mode,
             'embed_model'         => $this->embedder->model(),
-            'workspaces'          => $workspaces->map(fn($w) => ['id' => $w->id, 'name' => $w->name, 'slug' => $w->slug]),
+            'workspaces'          => $workspaces->map(fn($w) => [
+                'id'           => $w->id,
+                'name'         => $w->name,
+                'slug'         => $w->slug,
+                'memory_count' => $countsByWorkspace[$w->id] ?? 0,
+            ]),
             'active_workspace_id' => $filterWorkspaceId,
         ]);
     }
