@@ -10,9 +10,10 @@ use App\Http\Controllers\Web\TaskWebController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// Public boards — no auth
-Route::get('/board',        [PublicDashboardController::class, 'index'])->name('public.boards');
-Route::get('/board/{slug}', [PublicDashboardController::class, 'show'])->name('public.board');
+// Public boards — disabled to prevent cross-workspace data leakage
+// Re-enable by uncommenting and removing the redirect below
+Route::get('/board',        fn() => redirect()->route('login'))->name('public.boards');
+Route::get('/board/{slug}', fn() => redirect()->route('login'))->name('public.board');
 
 // Root redirect
 Route::get('/', fn() => redirect()->route(
