@@ -99,19 +99,20 @@ class MemoryService
     }
 
     /**
-     * Semantic search across all embedded memories in a workspace.
-     * Returns memories sorted by cosine similarity descending.
+     * Semantic search across memories.
+     * Pass an array of workspace IDs to search (org-wide = all workspaces).
+     * Pass a single workspace ID string to search within one workspace.
      */
-    public function search(string $query, string $workspaceId, int $limit = 10): array
+    public function search(string $query, array|string $workspaceIds, int $limit = 10): array
     {
         $queryVector = $this->embedder->embed($query);
+        $ids         = (array) $workspaceIds;
 
         if (!$queryVector) {
             return ['results' => [], 'embedded' => false, 'fallback' => 'keyword'];
         }
 
-        // Load all embedded, non-expired memories in this workspace
-        $memories = AgentMemory::where('workspace_id', $workspaceId)
+        $memories = AgentMemory::whereIn('workspace_id', $ids)
             ->whereNotNull('embedding')
             ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->get();
@@ -135,9 +136,11 @@ class MemoryService
     /**
      * Keyword fallback search for when Ollama is unreachable.
      */
-    public function keywordSearch(string $query, string $workspaceId, int $limit = 10): \Illuminate\Database\Eloquent\Collection
+    public function keywordSearch(string $query, array|string $workspaceIds, int $limit = 10): \Illuminate\Database\Eloquent\Collection
     {
-        return AgentMemory::where('workspace_id', $workspaceId)
+        $ids = (array) $workspaceIds;
+
+        return AgentMemory::whereIn('workspace_id', $ids)
             ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->where(fn($q) =>
                 $q->where('label', 'like', "%{$query}%")

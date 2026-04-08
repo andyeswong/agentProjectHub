@@ -4,24 +4,32 @@ import { router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 
 const props = defineProps({
-    memories:       Array,
-    stats:          Object,
-    filters:        Object,
-    search_mode:    String,
-    embed_model:    String,
-    workspace_name: String,
+    memories:            Array,
+    stats:               Object,
+    filters:             Object,
+    search_mode:         String,
+    embed_model:         String,
+    workspaces:          Array,
+    active_workspace_id: String,
 })
 
 // ── Search state ─────────────────────────────────────────────────────────
-const searchQuery  = ref(props.filters?.q ?? '')
-const activeType   = ref(props.filters?.type ?? '')
-const semanticMode = ref(props.filters?.semantic ?? false)
+const searchQuery       = ref(props.filters?.q ?? '')
+const activeType        = ref(props.filters?.type ?? '')
+const semanticMode      = ref(props.filters?.semantic ?? false)
+const activeWorkspaceId = ref(props.active_workspace_id ?? '')
+
+const activeWorkspaceName = computed(() => {
+    if (!activeWorkspaceId.value) return 'All workspaces'
+    return props.workspaces?.find(w => w.id === activeWorkspaceId.value)?.name ?? 'All workspaces'
+})
 
 function runSearch() {
     router.get('/memory', {
-        q:        searchQuery.value || undefined,
-        type:     activeType.value || undefined,
-        semantic: semanticMode.value || undefined,
+        q:            searchQuery.value || undefined,
+        type:         activeType.value || undefined,
+        semantic:     semanticMode.value || undefined,
+        workspace_id: activeWorkspaceId.value || undefined,
     }, { preserveState: true, replace: true })
 }
 
@@ -30,10 +38,16 @@ function setType(type) {
     runSearch()
 }
 
+function setWorkspace(id) {
+    activeWorkspaceId.value = id
+    runSearch()
+}
+
 function clearSearch() {
-    searchQuery.value = ''
-    activeType.value  = ''
-    semanticMode.value = false
+    searchQuery.value       = ''
+    activeType.value        = ''
+    semanticMode.value      = false
+    activeWorkspaceId.value = ''
     router.get('/memory', {}, { preserveState: false, replace: true })
 }
 
@@ -105,7 +119,7 @@ const types = ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'skill', 
                 <div>
                     <h1 class="text-xl font-semibold" style="color: var(--color-text-primary);">Shared Memory</h1>
                     <p class="text-xs mt-0.5" style="color: var(--color-text-muted);">
-                        {{ workspace_name }} · {{ stats?.total ?? 0 }} memories · {{ stats?.embedded ?? 0 }} embedded
+                        {{ activeWorkspaceName }} · {{ stats?.total ?? 0 }} memories · {{ stats?.embedded ?? 0 }} embedded
                     </p>
                 </div>
 
@@ -131,6 +145,27 @@ const types = ['credential', 'domain', 'ip', 'fact', 'config', 'note', 'skill', 
                     </div>
                     <p class="text-lg font-semibold" style="color: var(--color-text-primary);">{{ stats.by_type[t] ?? 0 }}</p>
                 </div>
+            </div>
+
+            <!-- Workspace tabs -->
+            <div v-if="workspaces?.length > 1" class="flex flex-wrap gap-2">
+                <button
+                    @click="setWorkspace('')"
+                    class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                    :style="!activeWorkspaceId
+                        ? 'background-color: var(--color-accent); color: #0d0f14;'
+                        : 'border: 1px solid var(--color-surface-border); color: var(--color-text-muted);'">
+                    All workspaces
+                </button>
+                <button
+                    v-for="ws in workspaces" :key="ws.id"
+                    @click="setWorkspace(ws.id)"
+                    class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                    :style="activeWorkspaceId === ws.id
+                        ? 'background-color: var(--color-accent); color: #0d0f14;'
+                        : 'border: 1px solid var(--color-surface-border); color: var(--color-text-muted);'">
+                    {{ ws.name }}
+                </button>
             </div>
 
             <!-- Search + filters -->

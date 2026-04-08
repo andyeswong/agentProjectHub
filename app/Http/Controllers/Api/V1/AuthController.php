@@ -185,11 +185,27 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $apiKey = $request->attributes->get('api_key');
+        $org    = $apiKey->organization;
+
+        // Workspaces in this org with memory counts
+        $workspaces = \App\Models\Workspace::where('org_id', $org->id)
+            ->withCount('memories')
+            ->orderBy('name')
+            ->get()
+            ->map(fn($w) => [
+                'id'           => $w->id,
+                'name'         => $w->name,
+                'slug'         => $w->slug,
+                'memory_count' => $w->memories_count,
+            ]);
+
+        $totalMemories = $workspaces->sum('memory_count');
 
         return response()->json([
             'api_key_id'      => $apiKey->id,
             'key_prefix'      => Str::substr($apiKey->key, 0, 20) . '...',
-            'org_id'          => $apiKey->organization->slug,
+            'org_id'          => $org->slug,
+            'org_name'        => $org->name,
             'model'           => $apiKey->model,
             'model_provider'  => $apiKey->model_provider,
             'client_type'     => $apiKey->client_type,
@@ -198,6 +214,15 @@ class AuthController extends Controller
             'rate_limit'      => $apiKey->rate_limit,
             'last_active_at'  => $apiKey->last_active_at,
             'registered_at'   => $apiKey->created_at,
+
+            'workspaces'      => $workspaces,
+            'memory_summary'  => [
+                'total'      => $totalMemories,
+                'by_workspace' => $workspaces->mapWithKeys(fn($w) => [
+                    $w['slug'] => $w['memory_count'],
+                ]),
+                'hint' => 'Pass workspace_id=<uuid> to memory endpoints to scope reads/writes to a specific workspace.',
+            ],
         ]);
     }
 

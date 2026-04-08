@@ -22,4 +22,9 @@ class Workspace extends Model
     {
         return $this->hasMany(Project::class);
     }
+
+    public function memories(): HasMany
+    {
+        return $this->hasMany(AgentMemory::class);
+    }
 }

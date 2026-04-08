@@ -21,22 +21,28 @@ class MemoryWebController extends Controller
 
     public function index(Request $request): Response
     {
-        $apiKey    = $request->attributes->get('pilot_api_key');
-        $workspace = $this->resolveWorkspace($apiKey);
+        $apiKey     = $request->attributes->get('pilot_api_key');
+        $org        = $apiKey->organization;
+        $workspaces = Workspace::where('org_id', $org->id)->orderBy('name')->get();
+        $allIds     = $workspaces->pluck('id')->all();
+
+        // Active workspace filter (null = all)
+        $filterWorkspaceId = $request->input('workspace_id');
+        $targetIds = $filterWorkspaceId && $workspaces->contains('id', $filterWorkspaceId)
+            ? [$filterWorkspaceId]
+            : $allIds;
 
         $q        = $request->input('q', '');
         $type     = $request->input('type', '');
         $semantic = $request->boolean('semantic');
 
-        $memories  = collect();
-        $scores    = [];
-        $mode      = 'list';
-        $embedded  = false;
+        $memories = collect();
+        $mode     = 'list';
+        $embedded = false;
 
         if ($q && $semantic) {
-            // Vector search
-            $result = $this->memoryService->search($q, $workspace?->id ?? '', 30);
-            $mode   = $result['embedded'] ? 'semantic' : 'keyword_fallback';
+            $result   = $this->memoryService->search($q, $targetIds, 30);
+            $mode     = $result['embedded'] ? 'semantic' : 'keyword_fallback';
             $embedded = $result['embedded'];
 
             $memories = $result['results']->map(fn($r, $i) => [
@@ -44,8 +50,8 @@ class MemoryWebController extends Controller
                 '_score' => $r['score'],
                 '_rank'  => $i + 1,
             ]);
-        } elseif ($workspace) {
-            $query = AgentMemory::where('workspace_id', $workspace->id)
+        } else {
+            $query = AgentMemory::whereIn('workspace_id', $targetIds)
                 ->where(fn($q2) => $q2->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                 ->with(['creator', 'lastEditor']);
 
@@ -67,23 +73,24 @@ class MemoryWebController extends Controller
                 ->map(fn($m) => $m->toPublicArray());
         }
 
-        $stats = $workspace ? [
-            'total'       => AgentMemory::where('workspace_id', $workspace->id)->count(),
-            'by_type'     => AgentMemory::where('workspace_id', $workspace->id)
-                                ->selectRaw('type, count(*) as count')
-                                ->groupBy('type')
-                                ->pluck('count', 'type'),
-            'sensitive'   => AgentMemory::where('workspace_id', $workspace->id)->where('is_sensitive', true)->count(),
-            'embedded'    => AgentMemory::where('workspace_id', $workspace->id)->whereNotNull('embedding')->count(),
-        ] : null;
+        $stats = [
+            'total'     => AgentMemory::whereIn('workspace_id', $allIds)->count(),
+            'by_type'   => AgentMemory::whereIn('workspace_id', $allIds)
+                            ->selectRaw('type, count(*) as count')
+                            ->groupBy('type')
+                            ->pluck('count', 'type'),
+            'sensitive' => AgentMemory::whereIn('workspace_id', $allIds)->where('is_sensitive', true)->count(),
+            'embedded'  => AgentMemory::whereIn('workspace_id', $allIds)->whereNotNull('embedding')->count(),
+        ];
 
         return Inertia::render('Memory/Index', [
-            'memories'       => $memories->values(),
-            'stats'          => $stats,
-            'filters'        => ['q' => $q, 'type' => $type, 'semantic' => $semantic],
-            'search_mode'    => $mode,
-            'embed_model'    => $this->embedder->model(),
-            'workspace_name' => $workspace?->name,
+            'memories'            => $memories->values(),
+            'stats'               => $stats,
+            'filters'             => ['q' => $q, 'type' => $type, 'semantic' => $semantic, 'workspace_id' => $filterWorkspaceId],
+            'search_mode'         => $mode,
+            'embed_model'         => $this->embedder->model(),
+            'workspaces'          => $workspaces->map(fn($w) => ['id' => $w->id, 'name' => $w->name, 'slug' => $w->slug]),
+            'active_workspace_id' => $filterWorkspaceId,
         ]);
     }
 
@@ -93,26 +100,18 @@ class MemoryWebController extends Controller
      */
     public function reveal(Request $request, string $id): JsonResponse
     {
-        $apiKey    = $request->attributes->get('pilot_api_key');
-        $workspace = $this->resolveWorkspace($apiKey);
+        $apiKey  = $request->attributes->get('pilot_api_key');
+        $org     = $apiKey->organization;
+        $allIds  = Workspace::where('org_id', $org->id)->pluck('id')->all();
 
-        $memory = AgentMemory::where('workspace_id', $workspace?->id ?? '')
-            ->findOrFail($id);
+        $memory = AgentMemory::whereIn('workspace_id', $allIds)->findOrFail($id);
 
         return response()->json([
-            'id'    => $memory->id,
-            'label' => $memory->label,
-            'value' => $memory->value,
+            'id'      => $memory->id,
+            'label'   => $memory->label,
+            'value'   => $memory->value,
             'content' => $memory->content,
-            'type'  => $memory->type,
+            'type'    => $memory->type,
         ]);
-    }
-
-    private function resolveWorkspace($apiKey): ?Workspace
-    {
-        if ($apiKey->workspace_id) {
-            return Workspace::find($apiKey->workspace_id);
-        }
-        return Workspace::where('org_id', $apiKey->org_id)->first();
     }
 }
