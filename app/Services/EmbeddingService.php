@@ -11,6 +11,15 @@ class EmbeddingService
     private string $model;
     private int $timeout;
 
+    /**
+     * Hard cap on characters sent to the embedder. mxbai-embed-large only
+     * consumes ~512 tokens, and this Ollama build ignores the truncate flag
+     * (returns 400 "input length exceeds the context length" even with
+     * truncate=true), so we clip in PHP. ~1000 chars stays safely under the
+     * 512-token window for mixed ES/EN text without losing usable signal.
+     */
+    private const MAX_EMBED_CHARS = 1000;
+
     public function __construct()
     {
         $this->host    = rtrim(config('services.ollama.host'), '/');
@@ -24,6 +33,9 @@ class EmbeddingService
      */
     public function embed(string $text): ?array
     {
+        // Clip before sending: the embedder's truncate flag is unreliable here.
+        $text = mb_substr($text, 0, self::MAX_EMBED_CHARS);
+
         try {
             // Use /api/embed (not legacy /api/embeddings): truncate=true clips
             // input to the model's context window instead of erroring 500
