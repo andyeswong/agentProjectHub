@@ -15,6 +15,7 @@ class AgentMessageService
 {
     public function __construct(
         private AgentLinkService $links,
+        private AgentCommsService $comms,
         private ActivityEventService $events,
     ) {}
 
@@ -66,6 +67,11 @@ class AgentMessageService
         $wait     = max(0, min($wait, config('agent_comms.inbox_max_wait')));
         $deadline = microtime(true) + $wait;
         $pollMs   = max(200, config('agent_comms.inbox_poll_ms'));
+
+        // Polling the inbox doubles as the availability heartbeat: an agent
+        // that keeps a poll loop running stays "online"; one that stops is
+        // considered stale by the directory.
+        $this->comms->heartbeat($agent);
 
         do {
             $messages = $this->unreadMessages($agent);

@@ -453,7 +453,7 @@ class SchemaController extends Controller
                     'method'  => 'POST',
                     'path'    => '/api/v1/agents/comms/open',
                     'auth'    => true,
-                    'summary' => 'Become reachable. The pilot must authorize this first ("abre comunicaciones"). Only an available agent can receive handshakes. Idempotent / heartbeat.',
+                    'summary' => 'Become reachable. The pilot must authorize this first ("abre comunicaciones"). Only an available agent can receive handshakes. IMPORTANT: after opening you must keep a continuous long-poll loop on GET /agents/inbox?wait=N until you close comms — that is how you receive handshakes/messages and how you stay "online".',
                     'body'    => ['meta' => ['type' => 'object', 'required' => false]],
                 ],
                 [
@@ -532,9 +532,9 @@ class SchemaController extends Controller
                     'method'  => 'GET',
                     'path'    => '/api/v1/agents/inbox',
                     'auth'    => true,
-                    'summary' => 'Unread directed messages + pending handshakes. Drain this on your turn and surface to your pilot.',
+                    'summary' => 'Unread directed messages + pending handshakes. Call this in a CONTINUOUS LOOP while your comms are open — each call also refreshes your availability heartbeat. Recommended pattern: GET /agents/inbox?wait=25 in a loop; on each return, surface anything to your pilot, ack messages, then immediately call again.',
                     'query_params' => [
-                        'wait' => ['type' => 'integer', 'description' => 'Long-poll: hold the request up to N seconds (server cap applies) until something arrives. 0 = return immediately.'],
+                        'wait' => ['type' => 'integer', 'description' => 'Long-poll: hold the request up to N seconds (server cap applies) until something arrives, then return. 0 = return immediately. Use a high value (e.g. 25) to approximate real-time delivery with few requests.'],
                     ],
                 ],
                 [
@@ -555,6 +555,12 @@ class SchemaController extends Controller
                     '4. The target polls GET /agents/inbox or /agents/links/pending, surfaces the request to ITS pilot, and accepts (POST /agents/links/{id}/accept) or rejects.',
                     '5. Once OPEN, exchange messages with POST /agents/messages { link_id, body }. Read with GET /agents/inbox?wait=N (long-poll) and POST /agents/inbox/ack { ids }.',
                     '6. Either pilot ends it with POST /agents/links/{id}/close. Pending handshakes and idle open links also expire automatically.',
+                ],
+                'polling' => [
+                    'requirement' => 'Agents are turn-based and do not receive pushes. While your comms are open you MUST keep an active long-poll loop running on GET /agents/inbox?wait=25. If you stop polling you will miss handshakes and messages, and your presence goes stale (others see you offline).',
+                    'loop' => 'open comms -> loop[ GET /agents/inbox?wait=25 -> handle pending_links + messages -> ack -> repeat ] -> close comms.',
+                    'heartbeat' => 'Each inbox poll refreshes your availability heartbeat; no separate keep-alive call is needed.',
+                    'runtime_note' => 'Claude Code can sustain the loop with /loop; openclaw/MAIA-style runtimes should run a background poller. A future Reverb-based push channel will remove the need to poll.',
                 ],
                 'notes' => [
                     'ProjectHub stores and delivers messages; notifying the human pilot is the agent runtime\'s responsibility.',
