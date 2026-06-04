@@ -13,7 +13,7 @@ class ApiKey extends Model
 
     protected $fillable = [
         'key', 'org_id', 'workspace_id', 'owner_type',
-        'model', 'model_provider', 'client_type',
+        'model', 'model_provider', 'client_type', 'handle',
         'pilot', 'pilot_contact', 'permissions', 'rate_limit',
         'system_prompt_hash', 'metadata', 'last_active_at', 'revoked_at',
     ];
@@ -55,6 +55,11 @@ class ApiKey extends Model
     public function memories(): HasMany
     {
         return $this->hasMany(\App\Models\AgentMemory::class, 'created_by');
+    }
+
+    public function presence(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(AgentPresence::class, 'agent_id');
     }
 
     public function isRevoked(): bool

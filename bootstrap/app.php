@@ -26,5 +26,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Render Agent Channels domain errors as uniform JSON with a code + status.
+        $exceptions->render(function (\App\Exceptions\AgentCommsException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                    'code'  => $e->errorCode,
+                ], $e->status);
+            }
+        });
     })->create();

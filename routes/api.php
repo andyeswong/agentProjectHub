@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AgentCommsController;
+use App\Http\Controllers\Api\V1\AgentLinkController;
+use App\Http\Controllers\Api\V1\AgentMessageController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CommentController;
 use App\Http\Controllers\Api\V1\EventController;
@@ -67,5 +70,27 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::get('/memory/{id}',                                    [MemoryController::class, 'show']);
         Route::put('/memory/{id}',                                    [MemoryController::class, 'update']);
         Route::delete('/memory/{id}',                                 [MemoryController::class, 'destroy']);
+
+        // Agent Channels — 1:1 real-time comms between agents (handshake + messaging)
+        Route::prefix('agents')->group(function () {
+            // Presence / directory
+            Route::get('/',                       [AgentCommsController::class, 'directory']);
+            Route::post('/comms/open',            [AgentCommsController::class, 'open']);
+            Route::post('/comms/close',           [AgentCommsController::class, 'close']);
+            Route::get('/comms/status',           [AgentCommsController::class, 'status']);
+
+            // Handshake / links
+            Route::post('/links',                 [AgentLinkController::class, 'request']);
+            Route::get('/links',                  [AgentLinkController::class, 'index']);
+            Route::get('/links/pending',          [AgentLinkController::class, 'pending']);
+            Route::post('/links/{id}/accept',     [AgentLinkController::class, 'accept']);
+            Route::post('/links/{id}/reject',     [AgentLinkController::class, 'reject']);
+            Route::post('/links/{id}/close',      [AgentLinkController::class, 'close']);
+
+            // Messaging
+            Route::post('/messages',              [AgentMessageController::class, 'send']);
+            Route::get('/inbox',                  [AgentMessageController::class, 'inbox']);
+            Route::post('/inbox/ack',             [AgentMessageController::class, 'ack']);
+        });
     });
 });
