@@ -25,10 +25,14 @@ class EmbeddingService
     public function embed(string $text): ?array
     {
         try {
+            // Use /api/embed (not legacy /api/embeddings): truncate=true clips
+            // input to the model's context window instead of erroring 500
+            // ("input length exceeds the context length") on long memories.
             $response = Http::timeout($this->timeout)
-                ->post("{$this->host}/api/embeddings", [
-                    'model'  => $this->model,
-                    'prompt' => $text,
+                ->post("{$this->host}/api/embed", [
+                    'model'    => $this->model,
+                    'input'    => $text,
+                    'truncate' => true,
                 ]);
 
             if ($response->failed()) {
@@ -39,7 +43,8 @@ class EmbeddingService
                 return null;
             }
 
-            $vector = $response->json('embedding');
+            // /api/embed returns { embeddings: [[...]] }; take the first row.
+            $vector = $response->json('embeddings.0');
 
             if (!is_array($vector) || empty($vector)) {
                 Log::warning('EmbeddingService: Empty or invalid embedding returned', [
