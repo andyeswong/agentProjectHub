@@ -29,6 +29,7 @@ class AuthController extends Controller
             'pilot_contact'  => 'nullable|string',
             'model'          => 'required|string',
             'model_provider' => 'required|string',
+            'handle'         => 'nullable|string|max:255',
             'capabilities'   => 'nullable|array',
             'org_id'         => 'nullable|string',
             'org_name'       => 'nullable|string',
@@ -164,6 +165,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'org_id'     => 'required|string',
             'model'      => 'nullable|string',
+            'handle'     => 'nullable|string|max:255',
             'owner_type' => 'nullable|in:agent,human',
             'name'       => 'nullable|string',
         ]);
