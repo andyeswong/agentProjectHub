@@ -8,6 +8,7 @@ use App\Models\AgentMessage;
 use App\Models\ApiKey;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Directed 1:1 messages that flow inside an OPEN link, plus the inbox
@@ -94,6 +95,116 @@ class AgentMessageService
      *
      * @return array{messages: Collection, pending_links: Collection}
      */
+    /**
+     * RPC: send a request message and block until the matching response arrives
+     * (same link, same correlation_id, type=response, from the other party) or
+     * the timeout elapses. Reuses the LISTEN/NOTIFY fabric, so the wake is
+     * instant when the peer replies via agent_send(type=response, correlation_id).
+     *
+     * @return array{correlation_id: string, request: AgentMessage, response: ?AgentMessage, timed_out: bool}
+     */
+    public function rpc(ApiKey $from, string $linkId, array $data, int $timeout): array
+    {
+        $timeout = max(1, min($timeout, (int) config('agent_comms.inbox_max_wait')));
+        $cid     = $data['correlation_id'] ?? (string) Str::uuid();
+
+        $data['correlation_id'] = $cid;
+        $data['type']           = 'request';
+
+        // send() validates the open link transactionally and notifies the peer.
+        $request  = $this->send($from, $linkId, $data);
+        $response = $this->waitForResponse($from, $linkId, $cid, $timeout);
+
+        return [
+            'correlation_id' => $cid,
+            'request'        => $request,
+            'response'       => $response,
+            'timed_out'      => $response === null,
+        ];
+    }
+
+    /** Block for the RPC response carrying $cid, marking it read once consumed. */
+    private function waitForResponse(ApiKey $agent, string $linkId, string $cid, int $timeout): ?AgentMessage
+    {
+        $check = fn (): ?AgentMessage => AgentMessage::where('link_id', $linkId)
+            ->where('correlation_id', $cid)
+            ->where('type', 'response')
+            ->where('from_id', '!=', $agent->id)
+            ->with('from')
+            ->first();
+
+        $consume = function (?AgentMessage $m): ?AgentMessage {
+            if ($m && $m->read_at === null) {
+                $m->forceFill(['read_at' => now()])->save();
+            }
+            return $m;
+        };
+
+        if ($found = $check()) {
+            return $consume($found);
+        }
+
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $pdo     = DB::connection()->getPdo();
+            $channel = self::notifyChannel($agent->id);
+            $quoted  = '"' . str_replace('"', '""', $channel) . '"';
+            $pdo->exec('LISTEN ' . $quoted);
+            try {
+                $deadline = microtime(true) + $timeout;
+                while (true) {
+                    if ($found = $check()) {
+                        return $consume($found);
+                    }
+                    $remainingMs = (int) (($deadline - microtime(true)) * 1000);
+                    if ($remainingMs <= 0) {
+                        return null;
+                    }
+                    $pdo->pgsqlGetNotify(\PDO::FETCH_ASSOC, min($remainingMs, 5000));
+                }
+            } finally {
+                $pdo->exec('UNLISTEN ' . $quoted);
+            }
+        }
+
+        // Non-pgsql fallback (tests).
+        $deadline = microtime(true) + $timeout;
+        $pollMs   = max(200, (int) config('agent_comms.inbox_poll_ms'));
+        while (microtime(true) < $deadline) {
+            usleep($pollMs * 1000);
+            if ($found = $check()) {
+                return $consume($found);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Paginated message history for a link this agent is a party to — for
+     * rebuilding context after a session restart. Returns newest-first; pass
+     * ?before=<ISO> to page backwards.
+     */
+    public function history(ApiKey $agent, string $linkId, ?string $before, int $limit): Collection
+    {
+        // Authorize: must be a party to the link (throws if not).
+        $this->links->listFor($agent); // refreshes GC
+        $link = AgentLink::where('id', $linkId)
+            ->where(fn ($q) => $q->where('initiator_id', $agent->id)->orWhere('target_id', $agent->id))
+            ->first();
+
+        if (! $link) {
+            throw AgentCommsException::make('link_not_found', 'Link not found or you are not a party to it.', 404);
+        }
+
+        return AgentMessage::where('link_id', $linkId)
+            // Cast to Carbon so Eloquent binds it in the driver's datetime format
+            // (a raw ISO string would mis-compare lexically on some drivers).
+            ->when($before, fn ($q) => $q->where('created_at', '<', \Illuminate\Support\Carbon::parse($before)))
+            ->with('from')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
     public function inbox(ApiKey $agent, int $wait = 0): array
     {
         $wait = max(0, min($wait, config('agent_comms.inbox_max_wait')));

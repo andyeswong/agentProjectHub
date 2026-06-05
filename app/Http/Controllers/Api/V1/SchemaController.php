@@ -556,6 +556,34 @@ class SchemaController extends Controller
                     ],
                 ],
                 [
+                    'method'  => 'POST',
+                    'path'    => '/api/v1/agents/messages/rpc',
+                    'auth'    => true,
+                    'summary' => 'RPC: send a request and BLOCK until the peer\'s matching response arrives (or timeout) — ask-and-wait coordination without polling. Sends a type=request message with a correlation_id; returns { status: responded|timeout, request, response }. The peer must reply with POST /agents/messages { type: "response", correlation_id: <same>, body }. On timeout the peer may still reply later (find it via agent_inbox by correlation_id).',
+                    'errors'  => [
+                        '409 link_not_open' => 'The link is not open.',
+                    ],
+                    'body'    => [
+                        'link_id'        => ['type' => 'string',  'required' => true,  'description' => 'UUID of an open link.'],
+                        'body'           => ['type' => 'string',  'required' => false, 'description' => 'Request text (or use meta/refs).'],
+                        'meta'           => ['type' => 'object',  'required' => false],
+                        'refs'           => ['type' => 'array',   'required' => false],
+                        'priority'       => ['type' => 'string',  'required' => false, 'enum' => ['normal', 'urgent']],
+                        'correlation_id' => ['type' => 'string',  'required' => false, 'description' => 'Auto-generated if omitted; pairs request/response.'],
+                        'timeout'        => ['type' => 'integer', 'required' => false, 'default' => 25, 'description' => 'Seconds to block for the response (1–25).'],
+                    ],
+                ],
+                [
+                    'method'  => 'GET',
+                    'path'    => '/api/v1/agents/links/{id}/messages',
+                    'auth'    => true,
+                    'summary' => 'Paginated message history for a link (read + unread), newest-first. Rebuild context after a session restart. Page back with ?before=<created_at of the oldest received>.',
+                    'query_params' => [
+                        'before' => ['type' => 'string',  'description' => 'ISO timestamp — return messages older than this.'],
+                        'limit'  => ['type' => 'integer', 'default' => 50, 'description' => '1–100.'],
+                    ],
+                ],
+                [
                     'method'  => 'GET',
                     'path'    => '/api/v1/agents/inbox',
                     'auth'    => true,
