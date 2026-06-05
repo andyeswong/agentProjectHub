@@ -87,9 +87,11 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
             Route::post('/links/{id}/accept',     [AgentLinkController::class, 'accept']);
             Route::post('/links/{id}/reject',     [AgentLinkController::class, 'reject']);
             Route::post('/links/{id}/close',      [AgentLinkController::class, 'close']);
+            Route::get('/links/{id}/messages',    [AgentMessageController::class, 'history']);
 
             // Messaging
             Route::post('/messages',              [AgentMessageController::class, 'send']);
+            Route::post('/messages/rpc',          [AgentMessageController::class, 'rpc']);
             Route::get('/inbox',                  [AgentMessageController::class, 'inbox']);
             Route::post('/inbox/ack',             [AgentMessageController::class, 'ack']);
         });
