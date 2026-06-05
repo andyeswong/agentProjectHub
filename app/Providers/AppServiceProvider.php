@@ -29,5 +29,17 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute($limit)->by($key);
         });
+
+        // Tighter, separate bucket for sensitive reads (secret reveal + memory
+        // search) so a compromised key is rate-capped on exfiltration regardless
+        // of its generous global limit.
+        RateLimiter::for('sensitive', function (Request $request) {
+            $apiKey = $request->attributes->get('api_key');
+
+            $limit = (int) config('security.sensitive_rate_limit', 30);
+            $key   = ($apiKey?->id ?? $request->ip()) . ':sensitive';
+
+            return Limit::perMinute($limit)->by($key);
+        });
     }
 }

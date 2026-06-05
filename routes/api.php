@@ -28,6 +28,7 @@ Route::prefix('v1/auth')->group(function () {
 // Auth — protected endpoints
 Route::prefix('v1/auth')->middleware('api.auth')->group(function () {
     Route::get('/me',            [AuthController::class, 'me']);
+    Route::post('/revoke',       [AuthController::class, 'revoke']);
     Route::post('/pilot-token',  [AuthController::class, 'pilotToken']);
 });
 
@@ -65,9 +66,9 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         // Shared Agent Memory (vector search via mxbai-embed-large @ Ollama)
         Route::get('/memory',                                         [MemoryController::class, 'index']);
         Route::post('/memory',                                        [MemoryController::class, 'store']);
-        Route::post('/memory/search',                                 [MemoryController::class, 'search']);
+        Route::post('/memory/search',                                 [MemoryController::class, 'search'])->middleware('throttle:sensitive');
         Route::put('/memory/key/{key}',                               [MemoryController::class, 'upsertByKey']);
-        Route::get('/memory/{id}',                                    [MemoryController::class, 'show']);
+        Route::get('/memory/{id}',                                    [MemoryController::class, 'show'])->middleware('throttle:sensitive');
         Route::put('/memory/{id}',                                    [MemoryController::class, 'update']);
         Route::delete('/memory/{id}',                                 [MemoryController::class, 'destroy']);
 
