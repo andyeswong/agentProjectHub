@@ -14,7 +14,7 @@ class AgentLink extends Model
     protected $fillable = [
         'org_id', 'initiator_id', 'target_id', 'status', 'intent',
         'requested_at', 'responded_at', 'opened_at', 'closed_at',
-        'closed_by', 'close_reason', 'expires_at', 'last_activity_at',
+        'closed_by', 'close_reason', 'expires_at', 'last_activity_at', 'idle_ttl',
     ];
 
     protected $casts = [
@@ -24,6 +24,7 @@ class AgentLink extends Model
         'closed_at'        => 'datetime',
         'expires_at'       => 'datetime',
         'last_activity_at' => 'datetime',
+        'idle_ttl'         => 'integer',
     ];
 
     public function initiator(): BelongsTo
@@ -78,6 +79,7 @@ class AgentLink extends Model
             'close_reason'     => $this->close_reason,
             'expires_at'       => $this->expires_at,
             'last_activity_at' => $this->last_activity_at,
+            'idle_ttl'         => $this->idle_ttl,
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\AgentCommsException;
 use App\Models\AgentLink;
+use App\Models\AgentPresence;
 use App\Models\ApiKey;
 use Illuminate\Support\Collection;
 
@@ -19,7 +20,7 @@ class AgentLinkService
         private ActivityEventService $events,
     ) {}
 
-    public function request(ApiKey $initiator, string $targetHandle, ?string $intent): AgentLink
+    public function request(ApiKey $initiator, string $targetHandle, ?string $intent, ?int $idleTtl = null): AgentLink
     {
         if (! $this->comms->isAvailable($initiator)) {
             throw AgentCommsException::make('initiator_unavailable',
@@ -67,11 +68,13 @@ class AgentLinkService
             'requested_at'     => now(),
             'expires_at'       => now()->addSeconds(config('agent_comms.handshake_ttl')),
             'last_activity_at' => now(),
+            'idle_ttl'         => $idleTtl,
         ]);
 
         $this->events->record('agent.link_requested', 'agent_link', $link->id, $initiator, [
-            'target' => $target->handle,
-            'intent' => $intent,
+            'target'   => $target->handle,
+            'intent'   => $intent,
+            'idle_ttl' => $idleTtl,
         ]);
 
         return $link->load(['initiator', 'target']);
@@ -203,16 +206,56 @@ class AgentLinkService
         return $link;
     }
 
-    /** Expire pending handshakes past TTL and idle-close stale open links. */
+    /**
+     * Expire pending handshakes past TTL and idle-close stale open links.
+     *
+     * Idle-close honours two refinements (Sprint 2):
+     *  - Per-link idle_ttl: if the initiator declared one at link_request, it
+     *    overrides the global config('agent_comms.idle_ttl').
+     *  - Heartbeat keepalive: a link is NOT closed while BOTH parties are still
+     *    online (fresh presence heartbeat, which the inbox long-poll refreshes).
+     *    Silence between two attentive agents is not death. The link only idle-
+     *    closes once at least one party goes stale.
+     */
     public function expireStale(): void
     {
         AgentLink::where('status', 'pending')
             ->where('expires_at', '<=', now())
             ->update(['status' => 'expired']);
 
-        $idleBefore = now()->subSeconds(config('agent_comms.idle_ttl'));
-        AgentLink::where('status', 'open')
-            ->where('last_activity_at', '<=', $idleBefore)
-            ->update(['status' => 'closed', 'closed_at' => now(), 'close_reason' => 'idle_timeout']);
+        $defaultIdle   = (int) config('agent_comms.idle_ttl');
+        $heartbeatTtl  = (int) config('agent_comms.heartbeat_ttl');
+        $heartbeatFrom = now()->subSeconds($heartbeatTtl);
+
+        // Per-link idle_ttl forces an individual check, so evaluate open links in
+        // PHP. The fleet is small; revisit with a windowed query if it grows.
+        $candidates = AgentLink::where('status', 'open')
+            ->whereNotNull('last_activity_at')
+            ->get();
+
+        foreach ($candidates as $link) {
+            $ttl = $link->idle_ttl ?: $defaultIdle;
+            if ($link->last_activity_at->gt(now()->subSeconds($ttl))) {
+                continue; // still within its idle window
+            }
+
+            // Keepalive: both parties online with a fresh heartbeat → keep open.
+            $onlineParties = AgentPresence::whereIn('agent_id', [$link->initiator_id, $link->target_id])
+                ->where('status', 'available')
+                ->where('last_heartbeat', '>', $heartbeatFrom)
+                ->count();
+            if ($onlineParties === 2) {
+                continue;
+            }
+
+            $link->update([
+                'status'       => 'closed',
+                'closed_at'    => now(),
+                'close_reason' => 'idle_timeout',
+            ]);
+            $this->events->record('agent.link_closed', 'agent_link', $link->id, $link->initiator, [
+                'reason' => 'idle_timeout',
+            ]);
+        }
     }
 }

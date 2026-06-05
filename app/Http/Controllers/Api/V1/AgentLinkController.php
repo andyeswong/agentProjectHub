@@ -14,16 +14,17 @@ class AgentLinkController extends Controller
 
     public function __construct(private AgentLinkService $links) {}
 
-    // POST /api/v1/agents/links — request a handshake { target, intent? }
+    // POST /api/v1/agents/links — request a handshake { target, intent?, idle_ttl? }
     public function request(Request $request): JsonResponse
     {
         $agent = $this->agent($request);
         $data = $request->validate([
-            'target' => 'required|string|max:255',  // target handle
-            'intent' => 'nullable|string|max:2000',
+            'target'   => 'required|string|max:255',  // target handle
+            'intent'   => 'nullable|string|max:2000',
+            'idle_ttl' => 'nullable|integer|min:60|max:86400', // seconds; pace of this conversation
         ]);
 
-        $link = $this->links->request($agent, $data['target'], $data['intent'] ?? null);
+        $link = $this->links->request($agent, $data['target'], $data['intent'] ?? null, $data['idle_ttl'] ?? null);
 
         return response()->json([
             'status' => $link->status,
