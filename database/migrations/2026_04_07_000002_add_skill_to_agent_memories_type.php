@@ -5,23 +5,39 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    // Full allowed set for agent_memories.type after this migration.
+    private const TYPES = "'credential','domain','ip','fact','config','note','skill','other'";
+
     public function up(): void
     {
-        // ENUM MODIFY is MySQL-specific. Other drivers (e.g. sqlite for tests)
-        // store the type as a string with no DB-level enum to widen.
-        if (DB::getDriverName() !== 'mysql') {
+        $driver = DB::getDriverName();
+
+        if ($driver === 'mysql') {
+            DB::statement("ALTER TABLE agent_memories MODIFY COLUMN type ENUM(" . self::TYPES . ") NOT NULL DEFAULT 'fact'");
             return;
         }
-        DB::statement("ALTER TABLE agent_memories MODIFY COLUMN type ENUM('credential','domain','ip','fact','config','note','skill','other') NOT NULL DEFAULT 'fact'");
+
+        if ($driver === 'pgsql') {
+            // Laravel's ->enum() is a CHECK constraint on Postgres; widen it to include 'skill'.
+            DB::statement('ALTER TABLE agent_memories DROP CONSTRAINT IF EXISTS agent_memories_type_check');
+            DB::statement('ALTER TABLE agent_memories ADD CONSTRAINT agent_memories_type_check CHECK (type::text = ANY (ARRAY[' . self::TYPES . ']::text[]))');
+            return;
+        }
+        // sqlite / others: type is a plain string check; no-op.
     }
 
     public function down(): void
     {
-        if (DB::getDriverName() !== 'mysql') {
-            DB::statement("UPDATE agent_memories SET type = 'other' WHERE type = 'skill'");
+        $driver = DB::getDriverName();
+        DB::statement("UPDATE agent_memories SET type = 'other' WHERE type = 'skill'");
+
+        if ($driver === 'mysql') {
+            DB::statement("ALTER TABLE agent_memories MODIFY COLUMN type ENUM('credential','domain','ip','fact','config','note','other') NOT NULL DEFAULT 'fact'");
             return;
         }
-        DB::statement("UPDATE agent_memories SET type = 'other' WHERE type = 'skill'");
-        DB::statement("ALTER TABLE agent_memories MODIFY COLUMN type ENUM('credential','domain','ip','fact','config','note','other') NOT NULL DEFAULT 'fact'");
+        if ($driver === 'pgsql') {
+            DB::statement('ALTER TABLE agent_memories DROP CONSTRAINT IF EXISTS agent_memories_type_check');
+            DB::statement("ALTER TABLE agent_memories ADD CONSTRAINT agent_memories_type_check CHECK (type::text = ANY (ARRAY['credential','domain','ip','fact','config','note','other']::text[]))");
+        }
     }
 };
