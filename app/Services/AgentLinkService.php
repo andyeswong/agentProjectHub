@@ -19,6 +19,7 @@ class AgentLinkService
     public function __construct(
         private AgentCommsService $comms,
         private ActivityEventService $events,
+        private AgentWebhookService $webhooks,
     ) {}
 
     public function request(ApiKey $initiator, string $targetHandle, ?string $intent, ?int $idleTtl = null): AgentLink
@@ -85,6 +86,15 @@ class AgentLinkService
                 json_encode(['type' => 'handshake', 'link_id' => $link->id]),
             ]);
         }
+
+        // S3c: best-effort webhook wake to the target's callback_url.
+        $this->webhooks->wake($target->id, [
+            'event'   => 'handshake',
+            'link_id' => $link->id,
+            'from'    => $initiator->handle,
+            'intent'  => $intent,
+            'at'      => now()->toIso8601String(),
+        ]);
 
         return $link->load(['initiator', 'target']);
     }

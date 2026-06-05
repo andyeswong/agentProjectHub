@@ -14,7 +14,10 @@ class AgentPresence extends Model
 
     protected $fillable = [
         'agent_id', 'status', 'available_since', 'last_heartbeat', 'meta',
+        'callback_url', 'callback_secret',
     ];
+
+    protected $hidden = ['callback_secret'];
 
     protected $casts = [
         'available_since' => 'datetime',

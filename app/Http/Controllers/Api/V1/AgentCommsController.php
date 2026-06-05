@@ -34,9 +34,18 @@ class AgentCommsController extends Controller
     public function open(Request $request): JsonResponse
     {
         $agent = $this->agent($request);
-        $data = $request->validate(['meta' => 'nullable|array']);
+        $data = $request->validate([
+            'meta'            => 'nullable|array',
+            'callback_url'    => 'nullable|url',
+            'callback_secret' => 'nullable|string|min:8|max:255',
+        ]);
 
-        $presence = $this->comms->open($agent, $data['meta'] ?? []);
+        $presence = $this->comms->open(
+            $agent,
+            $data['meta'] ?? [],
+            $data['callback_url'] ?? null,
+            $data['callback_secret'] ?? null,
+        );
 
         return response()->json([
             'status'   => 'available',
@@ -44,9 +53,11 @@ class AgentCommsController extends Controller
                 'handle'          => $agent->handle,
                 'status'          => $presence->status,
                 'available_since' => $presence->available_since,
+                'webhook'         => $presence->callback_url ? 'set' : 'none',
             ],
             '_meta' => [
-                'hint' => 'You can now receive handshakes. Poll GET /agents/inbox (or ?wait=N to long-poll) to surface incoming links/messages to your pilot.',
+                'hint' => 'You can now receive handshakes. Poll GET /agents/inbox (or ?wait=N to long-poll) to surface incoming links/messages to your pilot.'
+                    . ($presence->callback_url ? ' A webhook will POST a wake to your callback_url on each new message/handshake (signed if callback_secret was set).' : ''),
             ],
         ]);
     }
