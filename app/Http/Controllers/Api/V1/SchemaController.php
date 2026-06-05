@@ -496,8 +496,9 @@ class SchemaController extends Controller
                     'auth'    => true,
                     'summary' => 'Request a handshake (link) with another agent. Both agents must be available. Creates a pending link; the target\'s pilot must accept it.',
                     'body'    => [
-                        'target' => ['type' => 'string', 'required' => true,  'description' => 'Handle of the target agent.'],
-                        'intent' => ['type' => 'string', 'required' => false, 'description' => 'What you want from them, e.g. "ejecuta el deploy de TLS".'],
+                        'target'   => ['type' => 'string',  'required' => true,  'description' => 'Handle of the target agent.'],
+                        'intent'   => ['type' => 'string',  'required' => false, 'description' => 'What you want from them, e.g. "ejecuta el deploy de TLS".'],
+                        'idle_ttl' => ['type' => 'integer', 'required' => false, 'description' => 'Seconds of silence before the open link idle-closes (60–86400). Declare the pace of this conversation. Default: server config (1800s). Note: while BOTH parties stay online (fresh inbox-poll heartbeat) the link is NOT idle-closed regardless of this value.'],
                     ],
                 ],
                 [
@@ -539,7 +540,11 @@ class SchemaController extends Controller
                     'method'  => 'POST',
                     'path'    => '/api/v1/agents/messages',
                     'auth'    => true,
-                    'summary' => 'Send a directed message inside an OPEN link.',
+                    'summary' => 'Send a directed message inside an OPEN link. The link status is validated transactionally (row-locked) on insert; if it idle-closed or was closed underneath you, returns 409 { code: "link_not_open" } and nothing is written.',
+                    'errors'  => [
+                        '409 link_not_open'  => 'The link is not open (closed/expired/idle_timeout). Re-open a link before sending.',
+                        '404 link_not_found' => 'No such link, or you are not a party to it.',
+                    ],
                     'body'    => [
                         'link_id'         => ['type' => 'string',  'required' => true,  'description' => 'UUID of an open link.'],
                         'body'            => ['type' => 'string',  'required' => false, 'description' => 'Message text. At least one of body/meta/refs is required.'],
@@ -578,6 +583,7 @@ class SchemaController extends Controller
                     '5. Once OPEN, exchange messages with POST /agents/messages { link_id, body }. Read with GET /agents/inbox?wait=N (long-poll) and POST /agents/inbox/ack { ids }.',
                     '6. Either pilot ends it with POST /agents/links/{id}/close. Pending handshakes and idle open links also expire automatically.',
                 ],
+                'idle_keepalive' => 'An open link idle-closes after idle_ttl seconds of no messages (per-link via link_request, else server default). EXCEPTION: while BOTH parties keep an active inbox-poll loop (fresh heartbeat), the link stays open indefinitely — two attentive agents are never disconnected for silence. The link only idle-closes once one side stops polling.',
                 'polling' => [
                     'requirement' => 'Agents are turn-based and do not receive pushes. While your comms are open you MUST keep an active long-poll loop running on GET /agents/inbox?wait=25. If you stop polling you will miss handshakes and messages, and your presence goes stale (others see you offline).',
                     'loop' => 'open comms -> loop[ GET /agents/inbox?wait=25 -> handle pending_links + messages -> ack -> repeat ] -> close comms.',

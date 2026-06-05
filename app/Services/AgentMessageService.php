@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\AgentCommsException;
 use App\Models\AgentLink;
 use App\Models\AgentMessage;
 use App\Models\ApiKey;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Directed 1:1 messages that flow inside an OPEN link, plus the inbox
@@ -21,39 +23,57 @@ class AgentMessageService
 
     public function send(ApiKey $from, string $linkId, array $data): AgentMessage
     {
-        $link = $this->links->openLinkForSend($from, $linkId);
-
-        if (! empty($data['idempotency_key'])) {
-            $existing = AgentMessage::where('from_id', $from->id)
-                ->where('idempotency_key', $data['idempotency_key'])
+        // Validate the link is OPEN and insert the message in ONE transaction,
+        // locking the link row so a concurrent idle-close (GC) cannot slip in
+        // between the check and the insert. If the link expired/closed in the
+        // meantime the row lock surfaces it and we return 409 link_not_open.
+        return DB::transaction(function () use ($from, $linkId, $data) {
+            $link = AgentLink::where('id', $linkId)
+                ->where(fn ($q) => $q->where('initiator_id', $from->id)->orWhere('target_id', $from->id))
+                ->lockForUpdate()
                 ->first();
-            if ($existing) {
-                return $existing->load('from');
+
+            if (! $link) {
+                throw AgentCommsException::make('link_not_found',
+                    'Link not found or you are not a party to it.', 404);
             }
-        }
+            if (! $link->isOpen()) {
+                throw AgentCommsException::make('link_not_open',
+                    "Link is '{$link->status}'. Messages require an open link.", 409);
+            }
 
-        $message = AgentMessage::create([
-            'org_id'          => $link->org_id,
-            'link_id'         => $link->id,
-            'from_id'         => $from->id,
-            'type'            => $data['type'] ?? 'message',
-            'correlation_id'  => $data['correlation_id'] ?? null,
-            'body'            => $data['body'] ?? null,
-            'meta'            => $data['meta'] ?? null,
-            'refs'            => $data['refs'] ?? null,
-            'priority'        => $data['priority'] ?? 'normal',
-            'idempotency_key' => $data['idempotency_key'] ?? null,
-        ]);
+            if (! empty($data['idempotency_key'])) {
+                $existing = AgentMessage::where('from_id', $from->id)
+                    ->where('idempotency_key', $data['idempotency_key'])
+                    ->first();
+                if ($existing) {
+                    return $existing->load('from');
+                }
+            }
 
-        $link->update(['last_activity_at' => now()]);
+            $message = AgentMessage::create([
+                'org_id'          => $link->org_id,
+                'link_id'         => $link->id,
+                'from_id'         => $from->id,
+                'type'            => $data['type'] ?? 'message',
+                'correlation_id'  => $data['correlation_id'] ?? null,
+                'body'            => $data['body'] ?? null,
+                'meta'            => $data['meta'] ?? null,
+                'refs'            => $data['refs'] ?? null,
+                'priority'        => $data['priority'] ?? 'normal',
+                'idempotency_key' => $data['idempotency_key'] ?? null,
+            ]);
 
-        $this->events->record('agent.message_sent', 'agent_message', $message->id, $from, [
-            'link_id'  => $link->id,
-            'to'       => $link->otherParty($from->id),
-            'priority' => $message->priority,
-        ]);
+            $link->update(['last_activity_at' => now()]);
 
-        return $message->load('from');
+            $this->events->record('agent.message_sent', 'agent_message', $message->id, $from, [
+                'link_id'  => $link->id,
+                'to'       => $link->otherParty($from->id),
+                'priority' => $message->priority,
+            ]);
+
+            return $message->load('from');
+        });
     }
 
     /**
