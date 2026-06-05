@@ -25,6 +25,7 @@ class SchemaController extends Controller
 
             'rate_limiting' => [
                 'default'   => '120 requests/minute per API key',
+                'sensitive' => '30 requests/minute per API key on a separate bucket for secret reveal (GET /memory/{id}) and memory search — caps exfiltration rate.',
                 'header'    => 'X-RateLimit-Remaining',
                 'on_exceed' => 'HTTP 429 Too Many Requests',
             ],
@@ -83,6 +84,16 @@ class SchemaController extends Controller
                     'path'    => '/api/v1/auth/me',
                     'auth'    => true,
                     'summary' => 'Returns the current agent profile, org, and permissions.',
+                ],
+
+                [
+                    'method'  => 'POST',
+                    'path'    => '/api/v1/auth/revoke',
+                    'auth'    => true,
+                    'summary' => 'Kill-switch: revoke your OWN API key. Idempotent. After this the key can no longer authenticate; emits an agent.key_revoked audit event so your pilot is notified.',
+                    'body'    => [
+                        'reason' => ['type' => 'string', 'required' => false, 'example' => 'key may be compromised'],
+                    ],
                 ],
 
                 [
@@ -407,12 +418,20 @@ class SchemaController extends Controller
                     'method'  => 'GET',
                     'path'    => '/api/v1/events',
                     'auth'    => true,
-                    'summary' => 'Poll the immutable activity feed. Use ?since= to get only new events. Ideal for agent polling loops.',
+                    'summary' => 'Poll the immutable activity feed. Use ?since= to get only new events (polling loops). Also serves as the audit query: filter by actor, event_type, entity_type and date range.',
                     'query_params' => [
-                        'since'      => ['type' => 'string', 'description' => 'ISO 8601 timestamp — return only events after this point'],
-                        'project_id' => ['type' => 'string', 'description' => 'Filter to a specific project'],
+                        'since'       => ['type' => 'string', 'description' => 'ISO 8601 timestamp — return only events after this point'],
+                        'project_id'  => ['type' => 'string', 'description' => 'Filter to a specific project'],
+                        'actor'       => ['type' => 'string', 'description' => 'Audit: filter by actor api_key_id (who did it)'],
+                        'event_type'  => ['type' => 'string', 'description' => 'Audit: comma-separated event types, e.g. secret.revealed,secret.reveal_denied'],
+                        'entity_type' => ['type' => 'string', 'description' => 'Audit: filter by entity type, e.g. memory'],
+                        'from'        => ['type' => 'string', 'description' => 'Audit: ISO 8601 lower bound (inclusive)'],
+                        'to'          => ['type' => 'string', 'description' => 'Audit: ISO 8601 upper bound (inclusive)'],
+                        'order'       => ['type' => 'string', 'enum' => ['asc', 'desc'], 'default' => 'asc'],
+                        'limit'       => ['type' => 'integer', 'default' => 100],
                     ],
                     'polling_pattern' => 'Store the last event timestamp. Poll every N seconds with ?since=<last_timestamp>.',
+                    'audit_example'   => 'GET /api/v1/events?event_type=secret.revealed,secret.reveal_denied&from=2026-06-01&order=desc — every secret access this month.',
                     'event_types' => [
                         'agent.registered',
                         'project.created',
@@ -431,6 +450,7 @@ class SchemaController extends Controller
                         'memory.deleted',
                         'secret.revealed',
                         'secret.reveal_denied',
+                        'agent.key_revoked',
                         'agent.comms_opened',
                         'agent.comms_closed',
                         'agent.link_requested',
