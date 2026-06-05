@@ -119,11 +119,17 @@ class MemoryService
         if (DB::connection()->getDriverName() === 'pgsql') {
             $literal = "'[" . implode(',', array_map(fn ($f) => (float) $f, $queryVector)) . "]'";
 
+            // Select every column EXCEPT the bulky embedding_vec (never returned to
+            // clients); keep `embedding` so isEmbedded()/toPublicArray behave as before.
             $rows = AgentMemory::query()
                 ->whereIn('workspace_id', $ids)
                 ->whereNotNull('embedding_vec')
                 ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-                ->select('*')
+                ->select([
+                    'id', 'workspace_id', 'created_by', 'last_updated_by', 'memory_key',
+                    'type', 'label', 'content', 'value', 'tags', 'is_sensitive',
+                    'embedding', 'embedding_model', 'expires_at', 'created_at', 'updated_at',
+                ])
                 ->selectRaw("(embedding_vec <=> {$literal}::vector) AS distance")
                 ->orderByRaw("embedding_vec <=> {$literal}::vector")
                 ->limit($limit)

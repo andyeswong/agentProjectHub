@@ -28,6 +28,10 @@ class AgentMemory extends Model
         'expires_at'   => 'datetime',
     ];
 
+    // Never serialized: the pgvector column and the transient search distance.
+    // Still readable in code (e.g. $memory->distance) for ranking.
+    protected $hidden = ['embedding_vec', 'distance'];
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
