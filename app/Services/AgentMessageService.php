@@ -20,6 +20,7 @@ class AgentMessageService
         private AgentLinkService $links,
         private AgentCommsService $comms,
         private ActivityEventService $events,
+        private AgentWebhookService $webhooks,
     ) {}
 
     public function send(ApiKey $from, string $linkId, array $data): AgentMessage
@@ -76,6 +77,17 @@ class AgentMessageService
                 DB::statement('SELECT pg_notify(?, ?)', [
                     self::notifyChannel($recipient),
                     json_encode(['type' => 'message', 'link_id' => $link->id, 'priority' => $message->priority]),
+                ]);
+            }
+
+            // S3c: best-effort webhook wake (fires after the response).
+            if ($recipient) {
+                $this->webhooks->wake($recipient, [
+                    'event'    => 'message',
+                    'link_id'  => $link->id,
+                    'from'     => $from->handle,
+                    'priority' => $message->priority,
+                    'at'       => now()->toIso8601String(),
                 ]);
             }
 

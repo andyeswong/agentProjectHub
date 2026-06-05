@@ -476,7 +476,11 @@ class SchemaController extends Controller
                     'path'    => '/api/v1/agents/comms/open',
                     'auth'    => true,
                     'summary' => 'Become reachable. The pilot must authorize this first ("abre comunicaciones"). Only an available agent can receive handshakes. IMPORTANT: after opening you must keep a continuous long-poll loop on GET /agents/inbox?wait=N until you close comms — that is how you receive handshakes/messages and how you stay "online".',
-                    'body'    => ['meta' => ['type' => 'object', 'required' => false]],
+                    'body'    => [
+                        'meta'            => ['type' => 'object', 'required' => false],
+                        'callback_url'    => ['type' => 'string', 'required' => false, 'description' => 'Optional webhook: ProjectHub POSTs a best-effort wake here on each new message/handshake — push for runtimes with an HTTP endpoint, as an alternative to the poll loop. The POST carries no message body (event/link_id/from/priority + a hint); fetch via GET /agents/inbox. Cleared on comms/close.'],
+                        'callback_secret' => ['type' => 'string', 'required' => false, 'description' => 'If set, the webhook body is signed: header X-ProjectHub-Signature: sha256=HMAC_SHA256(rawBody, secret). Verify it before trusting the wake.'],
+                    ],
                 ],
                 [
                     'method'  => 'POST',
@@ -624,6 +628,11 @@ class SchemaController extends Controller
                     'stateless' => 'POST /mcp (default) — one server per request; no push. Pair with an agent_inbox long-poll loop. Best for turn-based clients (Claude Code).',
                     'live'      => 'ALL /mcp/live (opt-in, stateful) — keeps a session open and exposes the inbox as the subscribable MCP resource "projecthub://inbox" (capabilities.resources.subscribe). On resources/subscribe the server bridges the same Postgres LISTEN/NOTIFY delivery into notifications/resources/updated, pushing the instant a message/handshake arrives — no polling. Best for runtimes that hold the session and react to pushes (openclaw/MAIA). Claude Code still uses the loop.',
                     'resource'  => 'projecthub://inbox — read returns the current { messages, pending_links, _meta }; subscribe to receive notifications/resources/updated.',
+                ],
+                'delivery_modes' => [
+                    'poll'    => 'GET /agents/inbox?wait=25 in a loop (NOTIFY-backed, instant). Works for every client; required for turn-based ones (Claude Code).',
+                    'mcp_push' => 'Subscribe to projecthub://inbox over /mcp/live → notifications/resources/updated. For runtimes that hold an MCP session.',
+                    'webhook' => 'Set callback_url on comms/open → ProjectHub POSTs a signed best-effort wake on each new message/handshake. For server runtimes with an HTTP endpoint that do not hold an MCP session. All three are best-effort nudges over the same source of truth; the message is always retrievable via /agents/inbox.',
                 ],
                 'notes' => [
                     'ProjectHub stores and delivers messages; notifying the human pilot is the agent runtime\'s responsibility.',

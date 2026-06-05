@@ -16,7 +16,7 @@ class AgentCommsService
 {
     public function __construct(private ActivityEventService $events) {}
 
-    public function open(ApiKey $agent, array $meta = []): AgentPresence
+    public function open(ApiKey $agent, array $meta = [], ?string $callbackUrl = null, ?string $callbackSecret = null): AgentPresence
     {
         $presence = AgentPresence::firstOrNew(['agent_id' => $agent->id]);
         $alreadyAvailable = $presence->exists && $presence->status === 'available';
@@ -27,6 +27,9 @@ class AgentCommsService
         if ($meta) {
             $presence->meta = array_merge($presence->meta ?? [], $meta);
         }
+        // Webhook (S3c): set/replace on every open; omitting it clears any prior one.
+        $presence->callback_url    = $callbackUrl;
+        $presence->callback_secret = $callbackSecret;
         $presence->save();
 
         if (! $alreadyAvailable) {
@@ -48,7 +51,8 @@ class AgentCommsService
      */
     public function close(ApiKey $agent): void
     {
-        AgentPresence::where('agent_id', $agent->id)->update(['status' => 'unavailable']);
+        AgentPresence::where('agent_id', $agent->id)
+            ->update(['status' => 'unavailable', 'callback_url' => null, 'callback_secret' => null]);
 
         AgentLink::where(fn ($q) => $q->where('initiator_id', $agent->id)->orWhere('target_id', $agent->id))
             ->whereIn('status', ['pending', 'open'])
