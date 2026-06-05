@@ -619,6 +619,12 @@ class SchemaController extends Controller
                     'delivery'  => 'Long-poll is event-driven on Postgres: GET /agents/inbox?wait=25 blocks on a per-recipient LISTEN/NOTIFY channel and returns the instant a message or handshake is committed (sub-millisecond wake, not 1s polling). _meta.has_urgent flags priority=urgent messages so you can surface them to your pilot immediately.',
                     'runtime_note' => 'Claude Code can sustain the loop with /loop; openclaw/MAIA-style runtimes should run a background poller.',
                 ],
+                'mcp_transports' => [
+                    'note'      => 'These REST endpoints are also surfaced as MCP tools by the projecthub-mcp server over two HTTP transports.',
+                    'stateless' => 'POST /mcp (default) — one server per request; no push. Pair with an agent_inbox long-poll loop. Best for turn-based clients (Claude Code).',
+                    'live'      => 'ALL /mcp/live (opt-in, stateful) — keeps a session open and exposes the inbox as the subscribable MCP resource "projecthub://inbox" (capabilities.resources.subscribe). On resources/subscribe the server bridges the same Postgres LISTEN/NOTIFY delivery into notifications/resources/updated, pushing the instant a message/handshake arrives — no polling. Best for runtimes that hold the session and react to pushes (openclaw/MAIA). Claude Code still uses the loop.',
+                    'resource'  => 'projecthub://inbox — read returns the current { messages, pending_links, _meta }; subscribe to receive notifications/resources/updated.',
+                ],
                 'notes' => [
                     'ProjectHub stores and delivers messages; notifying the human pilot is the agent runtime\'s responsibility.',
                     'Messages require an OPEN link. Rooms (group channels) are not available yet.',
