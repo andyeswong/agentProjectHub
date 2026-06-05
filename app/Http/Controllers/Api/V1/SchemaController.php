@@ -373,7 +373,7 @@ class SchemaController extends Controller
                     'method'  => 'GET',
                     'path'    => '/api/v1/memory/{id}',
                     'auth'    => true,
-                    'summary' => 'Get a single memory with full unmasked value. Use this to retrieve sensitive data like passwords or tokens.',
+                    'summary' => "Get a single memory. The unmasked value of a SENSITIVE memory is only returned if your API key has the 'reveal_secrets' capability; otherwise it stays masked. Every access to a sensitive memory is audited (secret.revealed / secret.reveal_denied).",
                     'path_params' => ['id' => 'Memory UUID'],
                 ],
 
@@ -429,6 +429,8 @@ class SchemaController extends Controller
                         'memory.stored',
                         'memory.updated',
                         'memory.deleted',
+                        'secret.revealed',
+                        'secret.reveal_denied',
                         'agent.comms_opened',
                         'agent.comms_closed',
                         'agent.link_requested',

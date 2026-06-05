@@ -172,17 +172,36 @@ class MemoryController extends Controller
 
         $workspace = Workspace::find($mem->workspace_id);
 
+        // Revealing a sensitive value requires the elevated 'reveal_secrets'
+        // capability (separate from plain 'read'). Every access to a sensitive
+        // memory is audited — whether revealed or denied.
+        $canReveal = $apiKey->hasPermission('reveal_secrets');
+
+        if ($mem->is_sensitive) {
+            $this->events->record(
+                $canReveal ? 'secret.revealed' : 'secret.reveal_denied',
+                'memory',
+                $mem->id,
+                $apiKey,
+                ['label' => $mem->label, 'workspace_id' => $mem->workspace_id, 'memory_key' => $mem->memory_key],
+                $request->ip(),
+            );
+        }
+
         return response()->json([
-            'memory' => $mem->toPublicArray(revealSensitive: true),
+            'memory' => $mem->toPublicArray(revealSensitive: $canReveal),
             '_meta'  => [
                 'workspace_id'   => $mem->workspace_id,
                 'workspace_name' => $workspace?->name,
                 'is_expired'     => $mem->isExpired(),
                 'is_embedded'    => $mem->isEmbedded(),
                 'embed_model'    => $mem->embedding_model,
-                'hint'           => $mem->isExpired()
-                    ? 'This memory is expired. It will not appear in search or list results. Update expires_at to reactivate.'
-                    : null,
+                'revealed'       => $mem->is_sensitive ? $canReveal : null,
+                'hint'           => $mem->is_sensitive && ! $canReveal
+                    ? "This memory is sensitive and was returned MASKED — your API key lacks the 'reveal_secrets' capability. Ask your pilot to grant it."
+                    : ($mem->isExpired()
+                        ? 'This memory is expired. It will not appear in search or list results. Update expires_at to reactivate.'
+                        : null),
             ],
             'next_steps' => [
                 ['action' => 'Update this memory', 'method' => 'PUT',    'endpoint' => "/api/v1/memory/{$id}"],
