@@ -75,7 +75,7 @@ class PublicDashboardController extends Controller
                 $tasks = $p->tasks()
                     ->select('id', 'project_id', 'title', 'status', 'priority', 'assignee_id', 'due_date')
                     ->with('assignee:id,model,pilot')
-                    ->orderByRaw("FIELD(priority,'critical','high','medium','low')")
+                    ->orderByRaw("CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
                     ->get()
                     ->groupBy('status');
 

@@ -69,7 +69,7 @@ class TaskController extends Controller
             $query->where('created_at', '<=', $request->created_before);
         }
 
-        $tasks = $query->orderByRaw("FIELD(priority, 'critical','high','medium','low')")
+        $tasks = $query->orderByRaw("CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->orderBy('created_at')
             ->paginate($request->integer('limit', 50));
 

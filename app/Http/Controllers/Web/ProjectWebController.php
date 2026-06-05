@@ -56,7 +56,7 @@ class ProjectWebController extends Controller
 
         $tasks = $project->tasks()
             ->with(['assignee:id,model,pilot,client_type', 'creator:id,model,pilot'])
-            ->orderByRaw("FIELD(priority,'critical','high','medium','low')")
+            ->orderByRaw("CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->get()
             ->groupBy('status');
 
