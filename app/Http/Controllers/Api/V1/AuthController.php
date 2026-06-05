@@ -228,6 +228,40 @@ class AuthController extends Controller
         ]);
     }
 
+    // POST /api/v1/auth/revoke — agent revokes its OWN key (kill-switch).
+    // Idempotent. Emits agent.key_revoked so pilots/admins watching the event
+    // stream are notified. Once revoked, the key can no longer authenticate.
+    public function revoke(Request $request): JsonResponse
+    {
+        $apiKey = $request->attributes->get('api_key');
+
+        if ($apiKey->revoked_at) {
+            return response()->json([
+                'status'     => 'already_revoked',
+                'revoked_at' => $apiKey->revoked_at,
+            ]);
+        }
+
+        $apiKey->revoked_at = now();
+        $apiKey->save();
+
+        $this->events->record('agent.key_revoked', 'api_key', $apiKey->id, $apiKey, [
+            'handle' => $apiKey->handle,
+            'model'  => $apiKey->model,
+            'pilot'  => $apiKey->pilot,
+            'reason' => $request->input('reason'),
+            'self'   => true,
+        ], $request->ip());
+
+        return response()->json([
+            'status'     => 'revoked',
+            'revoked_at' => $apiKey->revoked_at,
+            '_meta'      => [
+                'hint' => 'This key can no longer authenticate. Issue a new one via /auth/register. The agent.key_revoked event is in the audit log for your pilot.',
+            ],
+        ]);
+    }
+
     // POST /api/v1/auth/pilot-token — agent generates a token for their human
     public function pilotToken(Request $request): JsonResponse
     {
