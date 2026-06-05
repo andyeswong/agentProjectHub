@@ -58,8 +58,9 @@ class AgentMessageController extends Controller
             '_meta' => [
                 'unread'        => $result['messages']->count(),
                 'pending'       => $result['pending_links']->count(),
+                'has_urgent'    => $result['messages']->contains(fn ($m) => $m->priority === 'urgent'),
                 'long_poll'     => $wait > 0,
-                'hint'          => 'Ack messages with POST /agents/inbox/ack { ids:[...] }. Respond to pending_links with accept/reject.',
+                'hint'          => 'Ack messages with POST /agents/inbox/ack { ids:[...] }. Respond to pending_links with accept/reject. If has_urgent, surface to your pilot immediately.',
             ],
         ]);
     }
