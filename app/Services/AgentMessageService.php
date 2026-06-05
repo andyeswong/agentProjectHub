@@ -66,9 +66,21 @@ class AgentMessageService
 
             $link->update(['last_activity_at' => now()]);
 
+            $recipient = $link->otherParty($from->id);
+
+            // Wake the recipient's inbox long-poll the instant this commits.
+            // Inside the transaction, Postgres queues the NOTIFY and delivers it
+            // on COMMIT — atomic with the insert above. No-op on other drivers.
+            if ($recipient && DB::connection()->getDriverName() === 'pgsql') {
+                DB::statement('SELECT pg_notify(?, ?)', [
+                    self::notifyChannel($recipient),
+                    json_encode(['type' => 'message', 'link_id' => $link->id, 'priority' => $message->priority]),
+                ]);
+            }
+
             $this->events->record('agent.message_sent', 'agent_message', $message->id, $from, [
                 'link_id'  => $link->id,
-                'to'       => $link->otherParty($from->id),
+                'to'       => $recipient,
                 'priority' => $message->priority,
             ]);
 
@@ -84,30 +96,86 @@ class AgentMessageService
      */
     public function inbox(ApiKey $agent, int $wait = 0): array
     {
-        $wait     = max(0, min($wait, config('agent_comms.inbox_max_wait')));
-        $deadline = microtime(true) + $wait;
-        $pollMs   = max(200, config('agent_comms.inbox_poll_ms'));
+        $wait = max(0, min($wait, config('agent_comms.inbox_max_wait')));
 
         // Polling the inbox doubles as the availability heartbeat: an agent
         // that keeps a poll loop running stays "online"; one that stops is
         // considered stale by the directory.
         $this->comms->heartbeat($agent);
 
-        do {
-            $messages = $this->unreadMessages($agent);
-            $pending  = $this->links->pending($agent);
+        // Immediate, non-blocking check first — also the wait=0 fast path.
+        $found = $this->drainInbox($agent);
+        if ($wait === 0 || $found['messages']->isNotEmpty() || $found['pending_links']->isNotEmpty()) {
+            return $found;
+        }
 
-            if ($messages->isNotEmpty() || $pending->isNotEmpty() || $wait === 0) {
-                return ['messages' => $messages, 'pending_links' => $pending];
-            }
+        // Postgres: block on LISTEN/NOTIFY so we return the instant a message
+        // or handshake arrives (sub-millisecond wake), instead of busy-polling.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            return $this->waitViaNotify($agent, $wait);
+        }
 
-            if (microtime(true) >= $deadline) {
-                break;
-            }
+        // Other drivers (sqlite tests): fall back to a short busy-poll loop.
+        $deadline = microtime(true) + $wait;
+        $pollMs   = max(200, config('agent_comms.inbox_poll_ms'));
+        while (microtime(true) < $deadline) {
             usleep($pollMs * 1000);
-        } while (microtime(true) < $deadline);
+            $found = $this->drainInbox($agent);
+            if ($found['messages']->isNotEmpty() || $found['pending_links']->isNotEmpty()) {
+                return $found;
+            }
+        }
 
         return ['messages' => collect(), 'pending_links' => collect()];
+    }
+
+    /** Per-agent Postgres NOTIFY channel an inbox waiter LISTENs on. */
+    public static function notifyChannel(string $agentId): string
+    {
+        return 'inbox:' . $agentId;
+    }
+
+    /**
+     * Block up to $wait seconds on the agent's NOTIFY channel, re-draining the
+     * inbox whenever woken. LISTEN is issued BEFORE the (re)check so a message
+     * arriving mid-check is not missed — its notification is queued and picked
+     * up by the next pgsqlGetNotify.
+     */
+    private function waitViaNotify(ApiKey $agent, int $wait): array
+    {
+        $pdo     = DB::connection()->getPdo();
+        $channel = self::notifyChannel($agent->id);
+        $quoted  = '"' . str_replace('"', '""', $channel) . '"';
+
+        $pdo->exec('LISTEN ' . $quoted);
+        try {
+            $deadline = microtime(true) + $wait;
+            while (true) {
+                $found = $this->drainInbox($agent);
+                if ($found['messages']->isNotEmpty() || $found['pending_links']->isNotEmpty()) {
+                    return $found;
+                }
+
+                $remainingMs = (int) (($deadline - microtime(true)) * 1000);
+                if ($remainingMs <= 0) {
+                    return ['messages' => collect(), 'pending_links' => collect()];
+                }
+
+                // Blocks until a NOTIFY on this channel or the timeout elapses.
+                $pdo->pgsqlGetNotify(\PDO::FETCH_ASSOC, min($remainingMs, 5000));
+            }
+        } finally {
+            $pdo->exec('UNLISTEN ' . $quoted);
+        }
+    }
+
+    /** One non-blocking read of unread messages + pending handshakes. */
+    private function drainInbox(ApiKey $agent): array
+    {
+        return [
+            'messages'      => $this->unreadMessages($agent),
+            'pending_links' => $this->links->pending($agent),
+        ];
     }
 
     public function ack(ApiKey $agent, array $messageIds): int

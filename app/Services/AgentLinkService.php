@@ -7,6 +7,7 @@ use App\Models\AgentLink;
 use App\Models\AgentPresence;
 use App\Models\ApiKey;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Handshake / link lifecycle for 1:1 agent comms.
@@ -76,6 +77,14 @@ class AgentLinkService
             'intent'   => $intent,
             'idle_ttl' => $idleTtl,
         ]);
+
+        // Wake the target's inbox long-poll so the handshake surfaces instantly.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('SELECT pg_notify(?, ?)', [
+                AgentMessageService::notifyChannel($target->id),
+                json_encode(['type' => 'handshake', 'link_id' => $link->id]),
+            ]);
+        }
 
         return $link->load(['initiator', 'target']);
     }

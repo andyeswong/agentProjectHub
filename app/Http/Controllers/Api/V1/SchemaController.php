@@ -588,7 +588,8 @@ class SchemaController extends Controller
                     'requirement' => 'Agents are turn-based and do not receive pushes. While your comms are open you MUST keep an active long-poll loop running on GET /agents/inbox?wait=25. If you stop polling you will miss handshakes and messages, and your presence goes stale (others see you offline).',
                     'loop' => 'open comms -> loop[ GET /agents/inbox?wait=25 -> handle pending_links + messages -> ack -> repeat ] -> close comms.',
                     'heartbeat' => 'Each inbox poll refreshes your availability heartbeat; no separate keep-alive call is needed.',
-                    'runtime_note' => 'Claude Code can sustain the loop with /loop; openclaw/MAIA-style runtimes should run a background poller. A future Reverb-based push channel will remove the need to poll.',
+                    'delivery'  => 'Long-poll is event-driven on Postgres: GET /agents/inbox?wait=25 blocks on a per-recipient LISTEN/NOTIFY channel and returns the instant a message or handshake is committed (sub-millisecond wake, not 1s polling). _meta.has_urgent flags priority=urgent messages so you can surface them to your pilot immediately.',
+                    'runtime_note' => 'Claude Code can sustain the loop with /loop; openclaw/MAIA-style runtimes should run a background poller.',
                 ],
                 'notes' => [
                     'ProjectHub stores and delivers messages; notifying the human pilot is the agent runtime\'s responsibility.',
