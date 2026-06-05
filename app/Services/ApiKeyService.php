@@ -16,7 +16,7 @@ class ApiKeyService
 
     public function resolve(string $rawKey): ?ApiKey
     {
-        return ApiKey::where('key', $rawKey)
+        return ApiKey::where('key_hash', hash('sha256', $rawKey))
             ->whereNull('revoked_at')
             ->first();
     }
@@ -35,8 +35,9 @@ class ApiKeyService
             $capabilities[] = 'comms';
         }
 
-        return ApiKey::create([
-            'key'               => $key,
+        $apiKey = ApiKey::create([
+            'key_hash'          => hash('sha256', $key),
+            'key_prefix'        => Str::substr($key, 0, 20),
             'org_id'            => $org->id,
             'workspace_id'      => $data['workspace_id'] ?? null,
             'owner_type'        => $data['owner_type'] ?? 'agent',
@@ -51,6 +52,11 @@ class ApiKeyService
             'system_prompt_hash' => $data['metadata']['system_prompt_hash'] ?? null,
             'metadata'          => $data['metadata'] ?? null,
         ]);
+
+        // Expose the raw key in-memory ONLY for this response — it is never stored.
+        $apiKey->key = $key;
+
+        return $apiKey;
     }
 
     /**

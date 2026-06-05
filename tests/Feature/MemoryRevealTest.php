@@ -16,8 +16,10 @@ class MemoryRevealTest extends TestCase
 
     private function key(Organization $org, string $handle, array $perms): ApiKey
     {
+        $raw = 'sk_test_' . $handle . '_' . Str::random(8);
         return ApiKey::create([
-            'key'         => 'sk_test_' . $handle . '_' . Str::random(8),
+            'key'         => $raw,
+            'key_hash'    => hash('sha256', $raw),
             'org_id'      => $org->id,
             'owner_type'  => 'agent',
             'model'       => $handle,

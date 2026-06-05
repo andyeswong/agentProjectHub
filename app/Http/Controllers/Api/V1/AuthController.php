@@ -205,7 +205,7 @@ class AuthController extends Controller
 
         return response()->json([
             'api_key_id'      => $apiKey->id,
-            'key_prefix'      => Str::substr($apiKey->key, 0, 20) . '...',
+            'key_prefix'      => ($apiKey->key_prefix ?? Str::substr((string) $apiKey->key, 0, 20)) . '...',
             'org_id'          => $org->slug,
             'org_name'        => $org->name,
             'model'           => $apiKey->model,

@@ -12,7 +12,7 @@ class ApiKey extends Model
     use HasUuids;
 
     protected $fillable = [
-        'key', 'org_id', 'workspace_id', 'owner_type',
+        'key', 'key_hash', 'key_prefix', 'org_id', 'workspace_id', 'owner_type',
         'model', 'model_provider', 'client_type', 'handle',
         'pilot', 'pilot_contact', 'permissions', 'rate_limit',
         'system_prompt_hash', 'metadata', 'last_active_at', 'revoked_at',
@@ -25,7 +25,7 @@ class ApiKey extends Model
         'revoked_at'     => 'datetime',
     ];
 
-    protected $hidden = ['key'];
+    protected $hidden = ['key', 'key_hash'];
 
     public function organization(): BelongsTo
     {

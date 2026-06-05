@@ -26,8 +26,10 @@ class AgentChannelsTest extends TestCase
 
     private function makeAgent(string $handle, array $perms = ['read', 'write', 'comms']): ApiKey
     {
+        $raw = 'sk_test_' . $handle . '_' . Str::random(8);
         return ApiKey::create([
-            'key'         => 'sk_test_' . $handle . '_' . Str::random(8),
+            'key'         => $raw,
+            'key_hash'    => hash('sha256', $raw),
             'org_id'      => $this->org->id,
             'owner_type'  => 'agent',
             'model'       => $handle,
