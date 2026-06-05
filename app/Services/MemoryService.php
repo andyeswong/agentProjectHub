@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AgentMemory;
 use App\Models\ApiKey;
+use Illuminate\Support\Facades\DB;
 
 class MemoryService
 {
@@ -112,6 +113,31 @@ class MemoryService
             return ['results' => [], 'embedded' => false, 'fallback' => 'keyword'];
         }
 
+        // Postgres + pgvector: indexed ANN search via the HNSW index (embedding_vec
+        // <=> query). Floats are cast so the literal is injection-safe and the
+        // ORDER BY expression matches the index for it to be used.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $literal = "'[" . implode(',', array_map(fn ($f) => (float) $f, $queryVector)) . "]'";
+
+            $rows = AgentMemory::query()
+                ->whereIn('workspace_id', $ids)
+                ->whereNotNull('embedding_vec')
+                ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                ->select('*')
+                ->selectRaw("(embedding_vec <=> {$literal}::vector) AS distance")
+                ->orderByRaw("embedding_vec <=> {$literal}::vector")
+                ->limit($limit)
+                ->get();
+
+            $scored = $rows->map(fn (AgentMemory $m) => [
+                'memory' => $m,
+                'score'  => round(1 - (float) $m->distance, 6),
+            ])->values();
+
+            return ['results' => $scored, 'embedded' => true, 'fallback' => null];
+        }
+
+        // Fallback (sqlite tests / non-pgvector): load embeddings and cosine in PHP.
         $memories = AgentMemory::whereIn('workspace_id', $ids)
             ->whereNotNull('embedding')
             ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
