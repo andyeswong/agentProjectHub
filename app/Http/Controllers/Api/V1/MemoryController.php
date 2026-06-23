@@ -620,12 +620,22 @@ class MemoryController extends Controller
 
         // Build the MASKED raw block. Sensitive content is already redacted by
         // toPublicArray() — secrets never reach the external LLM.
+        // CLIP each memory body: the delta-extractor needs the salient facts,
+        // not whole documents. Clipping bounds the prompt so the LLM call
+        // completes inside the sync HTTP budget (nginx ~60s / client ~30s) —
+        // unbounded bodies (e.g. large infra notes) otherwise 504/time out.
+        $clip = 2200;
         $blocks = [];
         $provenance = [];
         $rawChars = 0;
+        $clippedAny = false;
         foreach ($memories as $m) {
-            $pub = $m->toPublicArray();
-            $content = $pub['content'] ?? '';
+            $pub     = $m->toPublicArray();
+            $content = (string) ($pub['content'] ?? '');
+            if (mb_strlen($content) > $clip) {
+                $content = mb_substr($content, 0, $clip) . ' …[clipped]';
+                $clippedAny = true;
+            }
             $blocks[] = "### [id: {$m->id}] ({$m->type}) {$m->label}\n{$content}";
             $rawChars += mb_strlen($m->label) + mb_strlen($content);
             $provenance[] = [
@@ -688,6 +698,7 @@ class MemoryController extends Controller
                 'knowledge_token_estimate' => $knTok,
                 'reduction_pct'         => $rawTok > 0 ? round(100 * ($rawTok - $knTok) / $rawTok, 1) : null,
                 'citations_cleaned'     => $citationsCleaned,
+                'source_clipped'        => $clippedAny,
                 'warning'               => 'EXPERIMENTAL. Consolidation is LOSSY by design — it drops examples and restated detail to produce applicable rules. Treat output as a CANDIDATE for human review, not a replacement for the source memories (kept in provenance).',
             ],
             'next_steps' => [
