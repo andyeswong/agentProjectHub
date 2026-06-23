@@ -572,9 +572,10 @@ class MemoryController extends Controller
         $rawTok = (int) round($rawChars / 4);
         $knTok  = (int) round($knowledgeChars / 4);
 
-        $this->events->record('memory.consolidated', 'memory', null, $apiKey, [
+        $this->events->record('memory.consolidated', 'workspace', $workspaceIds[0], $apiKey, [
             'query'                 => $data['q'],
             'memories_consolidated' => $memories->count(),
+            'source_memory_ids'     => array_column($provenance, 'id'),
             'model'                 => $out['model'],
             'scope'                 => $scopeLabel,
         ]);
