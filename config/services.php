@@ -50,7 +50,7 @@ return [
         'api_key'    => env('CONSOLIDATOR_API_KEY'),
         'model'      => env('CONSOLIDATOR_MODEL', 'deepseek-v4-flash'),
         'timeout'    => env('CONSOLIDATOR_TIMEOUT', 120),
-        'max_tokens' => env('CONSOLIDATOR_MAX_TOKENS', 4096),
+        'max_tokens' => env('CONSOLIDATOR_MAX_TOKENS', 8192),
     ],
 
 ];
