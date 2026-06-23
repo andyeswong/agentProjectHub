@@ -423,6 +423,7 @@ class MemoryController extends Controller
             'limit'        => 'nullable|integer|min:1|max:50',
             'type'         => 'nullable|string',
             'workspace_id' => 'nullable|uuid',
+            'spread'       => 'nullable|boolean',
         ]);
 
         $limit  = $data['limit'] ?? 10;
@@ -460,6 +461,24 @@ class MemoryController extends Controller
             'score'  => $r['score'],
             'rank'   => $i + 1,
         ])->values();
+        $directCount = $results->count();
+
+        // Spreading activation: auto-fire memories strongly associated with the
+        // direct hits (the "unconscious thoughts" that co-activate on recall).
+        $spreadCount = 0;
+        if ($request->boolean('spread', true)) {
+            $seed   = $result['results']->pluck('memory');
+            $rank   = $results->count();
+            foreach ($this->memory->spreadActivate($seed, $workspaceIds) as $s) {
+                $results->push([
+                    'memory' => $s['memory']->toPublicArray(),
+                    'score'  => round((float) $s['weight'], 4),
+                    'rank'   => ++$rank,
+                    'via'    => 'association',
+                ]);
+                $spreadCount++;
+            }
+        }
 
         return response()->json([
             'query'   => $data['q'],
@@ -472,6 +491,8 @@ class MemoryController extends Controller
                 'embed_model'     => $this->embedder->model(),
                 'total_searched'  => $totalSearched,
                 'results_returned'=> $results->count(),
+                'direct_hits'     => $directCount,
+                'spread_activated'=> $spreadCount,
                 'hint'            => $results->isEmpty()
                     ? 'No memories matched this query. Try storing relevant context first.'
                     : 'Results sorted by semantic similarity (1.0 = identical, 0.0 = unrelated). Score ≥ 0.75 is a strong match.',
@@ -586,6 +607,16 @@ class MemoryController extends Controller
             ]);
         }
 
+        // Spreading activation: pull in strongly-associated memories so the
+        // consolidation sees the co-activated context, not just the direct hits.
+        $spreadCount = 0;
+        foreach ($this->memory->spreadActivate($memories, $workspaceIds) as $s) {
+            if (!$memories->contains('id', $s['memory']->id)) {
+                $memories->push($s['memory']);
+                $spreadCount++;
+            }
+        }
+
         // Build the MASKED raw block. Sensitive content is already redacted by
         // toPublicArray() — secrets never reach the external LLM.
         $blocks = [];
@@ -649,6 +680,7 @@ class MemoryController extends Controller
                 'workspace_ids'         => $workspaceIds,
                 'retrieval'             => $result['embedded'] ? 'semantic' : 'keyword_fallback',
                 'memories_consolidated' => $memories->count(),
+                'spread_activated'      => $spreadCount,
                 'consolidator_model'    => $out['model'],
                 'llm_usage'             => $out['usage'],
                 'raw_token_estimate'    => $rawTok,

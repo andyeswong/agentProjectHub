@@ -244,6 +244,51 @@ class MemoryService
     }
 
     /**
+     * Spreading activation: given seed memories, auto-fire their strongly-weighted
+     * association edges and return the linked memories NOT already in the seed.
+     * This is the "unconscious thought" — retrieving X co-activates its associated
+     * thoughts. Edge weight >= $threshold fires; capped to avoid runaway spread.
+     *
+     * @param  \Illuminate\Support\Collection<AgentMemory>  $seed
+     * @return \Illuminate\Support\Collection<array{memory:AgentMemory, weight:float}>
+     */
+    public function spreadActivate($seed, array $workspaceIds, float $threshold = 0.5, int $cap = 10): \Illuminate\Support\Collection
+    {
+        $seedIds = $seed->pluck('id')->all();
+        $wanted  = []; // target id => strongest incoming edge weight
+
+        foreach ($seed as $m) {
+            foreach (($m->associations ?? []) as $a) {
+                if (empty($a['id']) || in_array($a['id'], $seedIds, true)) {
+                    continue;
+                }
+                $w = (float) ($a['weight'] ?? 1.0);
+                if ($w < $threshold) {
+                    continue;
+                }
+                $wanted[$a['id']] = max($wanted[$a['id']] ?? 0.0, $w);
+            }
+        }
+
+        if (empty($wanted)) {
+            return collect();
+        }
+
+        arsort($wanted);
+        $ids = array_slice(array_keys($wanted), 0, $cap);
+
+        $rows = AgentMemory::whereIn('workspace_id', $workspaceIds)
+            ->whereIn('id', $ids)
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->get();
+
+        return $rows
+            ->map(fn (AgentMemory $m) => ['memory' => $m, 'weight' => $wanted[$m->id] ?? 1.0])
+            ->sortByDesc('weight')
+            ->values();
+    }
+
+    /**
      * Build the text that gets embedded — combines label + content + type for richer context.
      * Public so controllers can re-embed on update without duplicating logic.
      */
