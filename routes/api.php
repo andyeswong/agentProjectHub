@@ -67,6 +67,7 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::get('/memory',                                         [MemoryController::class, 'index']);
         Route::post('/memory',                                        [MemoryController::class, 'store']);
         Route::post('/memory/search',                                 [MemoryController::class, 'search'])->middleware('throttle:sensitive');
+        Route::post('/memory/consolidate',                            [MemoryController::class, 'consolidate'])->middleware('throttle:sensitive'); // ⚠️ EXPERIMENTAL — LLM knowledge consolidator
         Route::put('/memory/key/{key}',                               [MemoryController::class, 'upsertByKey']);
         Route::get('/memory/{id}',                                    [MemoryController::class, 'show'])->middleware('throttle:sensitive');
         Route::put('/memory/{id}',                                    [MemoryController::class, 'update']);

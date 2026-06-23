@@ -41,4 +41,16 @@ return [
         'timeout'         => env('OLLAMA_TIMEOUT', 30),
     ],
 
+    // ⚠️ EXPERIMENTAL — knowledge consolidation LLM (OpenAI-compatible).
+    // Powers POST /api/v1/memory/consolidate only; the normal search path
+    // never touches this. Prod default: DeepSeek deepseek-v4-flash.
+    'consolidator' => [
+        'enabled'    => env('CONSOLIDATOR_ENABLED', false),
+        'base_url'   => env('CONSOLIDATOR_BASE_URL', 'https://api.deepseek.com/v1'),
+        'api_key'    => env('CONSOLIDATOR_API_KEY'),
+        'model'      => env('CONSOLIDATOR_MODEL', 'deepseek-v4-flash'),
+        'timeout'    => env('CONSOLIDATOR_TIMEOUT', 120),
+        'max_tokens' => env('CONSOLIDATOR_MAX_TOKENS', 4096),
+    ],
+
 ];

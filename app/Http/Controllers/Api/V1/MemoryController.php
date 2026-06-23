@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AgentMemory;
 use App\Models\Workspace;
 use App\Services\ActivityEventService;
+use App\Services\ConsolidatorService;
 use App\Services\EmbeddingService;
 use App\Services\MemoryService;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -18,6 +19,7 @@ class MemoryController extends Controller
         private MemoryService $memory,
         private EmbeddingService $embedder,
         private ActivityEventService $events,
+        private ConsolidatorService $consolidator,
     ) {}
 
     // ─────────────────────────────────────────────────────────────────────
@@ -471,6 +473,133 @@ class MemoryController extends Controller
                 ['action' => 'Store a relevant memory', 'method' => 'POST', 'endpoint' => '/api/v1/memory'],
             ] : [
                 ['action' => 'Get full detail (unmasked)', 'method' => 'GET', 'endpoint' => "/api/v1/memory/{$results->first()['memory']['id']}"],
+            ],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // POST /api/v1/memory/consolidate   ⚠️ EXPERIMENTAL
+    // Same retrieval as /search, but pipes the matched memories through an
+    // LLM knowledge-consolidator (config: services.consolidator, prod default
+    // DeepSeek deepseek-v4-flash) and returns ONE consolidated KNOWLEDGE block
+    // (rules + references + gotchas + provenance) instead of N raw memories.
+    //
+    // The normal /search path is untouched. Sensitive memory content is masked
+    // BEFORE being sent to the external model (toPublicArray redaction), so raw
+    // secrets never leave the box — they appear as [vault:mask] in the output.
+    // ─────────────────────────────────────────────────────────────────────
+    public function consolidate(Request $request): JsonResponse
+    {
+        $apiKey        = $request->attributes->get('api_key');
+        [$workspaceIds, $scopeLabel] = $this->resolveWorkspaceIds($apiKey, $request->input('workspace_id'));
+
+        if (empty($workspaceIds)) {
+            return $this->noWorkspaceError();
+        }
+
+        $data = $request->validate([
+            'q'            => 'required|string|min:2',
+            'limit'        => 'nullable|integer|min:1|max:50',
+            'workspace_id' => 'nullable|uuid',
+        ]);
+
+        if (!$this->consolidator->enabled()) {
+            return response()->json([
+                'error'        => 'The knowledge consolidator is disabled or misconfigured on this server.',
+                'code'         => 'consolidator_unavailable',
+                'experimental' => true,
+                'hint'         => 'Set CONSOLIDATOR_ENABLED=true plus CONSOLIDATOR_BASE_URL / CONSOLIDATOR_API_KEY / CONSOLIDATOR_MODEL in .env, then run php artisan config:clear. Until then, use POST /api/v1/memory/search.',
+            ], 503);
+        }
+
+        $limit  = $data['limit'] ?? 15;
+        $result = $this->memory->search($data['q'], $workspaceIds, $limit);
+
+        // Retrieval (semantic, or keyword fallback if Ollama is down).
+        $memories = $result['embedded']
+            ? $result['results']->pluck('memory')
+            : $this->memory->keywordSearch($data['q'], $workspaceIds, $limit);
+
+        if ($memories->isEmpty()) {
+            return response()->json([
+                'query'        => $data['q'],
+                'mode'         => 'consolidated',
+                'experimental' => true,
+                'knowledge'    => null,
+                'provenance'   => [],
+                '_meta'        => [
+                    'scope'                 => $scopeLabel,
+                    'memories_consolidated' => 0,
+                    'hint'                  => 'No memories matched this query, so there was nothing to consolidate.',
+                ],
+            ]);
+        }
+
+        // Build the MASKED raw block. Sensitive content is already redacted by
+        // toPublicArray() — secrets never reach the external LLM.
+        $blocks = [];
+        $provenance = [];
+        $rawChars = 0;
+        foreach ($memories as $m) {
+            $pub = $m->toPublicArray();
+            $content = $pub['content'] ?? '';
+            $blocks[] = "### [id: {$m->id}] ({$m->type}) {$m->label}\n{$content}";
+            $rawChars += mb_strlen($m->label) + mb_strlen($content);
+            $provenance[] = [
+                'id'    => $m->id,
+                'key'   => $m->memory_key,
+                'type'  => $m->type,
+                'label' => $m->label,
+            ];
+        }
+        $maskedRaw = implode("\n\n", $blocks);
+
+        $out = $this->consolidator->consolidate($maskedRaw, $data['q']);
+
+        if (!$out['ok']) {
+            return response()->json([
+                'error'        => $out['error'] ?? 'Consolidation failed.',
+                'code'         => 'consolidation_failed',
+                'experimental' => true,
+                'hint'         => 'Retrieval succeeded but the consolidator LLM call failed. The raw memories are still available via POST /api/v1/memory/search.',
+            ], 502);
+        }
+
+        $knowledge      = $out['knowledge'];
+        $knowledgeChars = mb_strlen($knowledge);
+        // Cheap server-side token estimate (chars/4). The LLM usage block, when
+        // the provider returns it, carries the real prompt/completion counts.
+        $rawTok = (int) round($rawChars / 4);
+        $knTok  = (int) round($knowledgeChars / 4);
+
+        $this->events->record('memory.consolidated', 'memory', null, $apiKey, [
+            'query'                 => $data['q'],
+            'memories_consolidated' => $memories->count(),
+            'model'                 => $out['model'],
+            'scope'                 => $scopeLabel,
+        ]);
+
+        return response()->json([
+            'query'        => $data['q'],
+            'mode'         => 'consolidated',
+            'experimental' => true,
+            'knowledge'    => $knowledge,
+            'provenance'   => $provenance,
+            '_meta'        => [
+                'scope'                 => $scopeLabel,
+                'workspace_ids'         => $workspaceIds,
+                'retrieval'             => $result['embedded'] ? 'semantic' : 'keyword_fallback',
+                'memories_consolidated' => $memories->count(),
+                'consolidator_model'    => $out['model'],
+                'llm_usage'             => $out['usage'],
+                'raw_token_estimate'    => $rawTok,
+                'knowledge_token_estimate' => $knTok,
+                'reduction_pct'         => $rawTok > 0 ? round(100 * ($rawTok - $knTok) / $rawTok, 1) : null,
+                'warning'               => 'EXPERIMENTAL. Consolidation is LOSSY by design — it drops examples and restated detail to produce applicable rules. Treat output as a CANDIDATE for human review, not a replacement for the source memories (kept in provenance).',
+            ],
+            'next_steps' => [
+                ['action' => 'Inspect a source memory', 'method' => 'GET',  'endpoint' => "/api/v1/memory/{$provenance[0]['id']}"],
+                ['action' => 'Get raw (unconsolidated)', 'method' => 'POST', 'endpoint' => '/api/v1/memory/search', 'body' => ['q' => $data['q']]],
             ],
         ]);
     }
