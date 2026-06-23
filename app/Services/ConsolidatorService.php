@@ -70,10 +70,16 @@ List every source id consumed, so the result is reconstructible and gateable.
   emit both with a "CONFLICT" tag — do not pick silently.
 - Drop nothing load-bearing. Cut redundancy, restated context, narration,
   dates that don't change behavior, and prose scaffolding.
+- MERGE AGGRESSIVELY. Do NOT reformat each memory into its own rules. Collapse
+  overlapping memories into the FEWEST general rules possible. If three memories
+  describe one subject, they become one rule set, not three. Maximize density.
 - Prefer the general rule over the instance.
-- Every line carries its [src: ...]. No orphan claims.
+- CITATIONS: every line ends with [src: id] or [src: id1, id2]. A citation
+  contains ONLY comma-separated source ids — NOTHING else. NEVER write a
+  question mark, alternatives, uncertainty, hedging, or any prose inside a
+  citation. If unsure which source, pick the single most likely id. No orphans.
 - Be terse. This output will live in a context window; tokens are the cost.
-- Output ONLY the four sections. No preamble, no closing remarks.
+- Output ONLY the four sections. No preamble, reasoning, or closing remarks.
 PROMPT;
 
     public function __construct()

@@ -565,7 +565,14 @@ class MemoryController extends Controller
             ], 502);
         }
 
-        $knowledge      = $out['knowledge'];
+        // Citation guard: reasoning models sometimes leak chain-of-thought INTO
+        // a [src: …] bracket (e.g. "[src: id? actually from … better cite …]")
+        // or cite ids that were never retrieved. Rewrite every citation to hold
+        // ONLY valid, comma-separated provenance ids — deterministic, model-agnostic.
+        $validIds  = array_column($provenance, 'id');
+        $rawKnowledge = $out['knowledge'];
+        $knowledge = $this->sanitizeCitations($rawKnowledge, $validIds);
+        $citationsCleaned = $knowledge !== $rawKnowledge;
         $knowledgeChars = mb_strlen($knowledge);
         // Cheap server-side token estimate (chars/4). The LLM usage block, when
         // the provider returns it, carries the real prompt/completion counts.
@@ -596,6 +603,7 @@ class MemoryController extends Controller
                 'raw_token_estimate'    => $rawTok,
                 'knowledge_token_estimate' => $knTok,
                 'reduction_pct'         => $rawTok > 0 ? round(100 * ($rawTok - $knTok) / $rawTok, 1) : null,
+                'citations_cleaned'     => $citationsCleaned,
                 'warning'               => 'EXPERIMENTAL. Consolidation is LOSSY by design — it drops examples and restated detail to produce applicable rules. Treat output as a CANDIDATE for human review, not a replacement for the source memories (kept in provenance).',
             ],
             'next_steps' => [
@@ -647,6 +655,24 @@ class MemoryController extends Controller
         }
 
         return $query->orderBy('name')->first();
+    }
+
+    /**
+     * Rewrite every [src: …] citation so it holds ONLY valid, comma-separated
+     * provenance ids. Strips leaked reasoning / hedging / invalid ids that some
+     * models emit inside the bracket. Deterministic, model-agnostic.
+     */
+    private function sanitizeCitations(string $knowledge, array $validIds): string
+    {
+        $valid = array_flip($validIds);
+
+        return preg_replace_callback('/\[src:[^\]]*\]/i', function ($m) use ($valid) {
+            // Pull any UUID-shaped tokens out of the bracket, keep only known ones.
+            preg_match_all('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', $m[0], $found);
+            $kept = array_values(array_unique(array_filter($found[0], fn ($id) => isset($valid[$id]))));
+
+            return empty($kept) ? '[src: unverified]' : '[src: ' . implode(', ', $kept) . ']';
+        }, $knowledge);
     }
 
     private function noWorkspaceError(): JsonResponse
