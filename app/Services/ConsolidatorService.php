@@ -97,6 +97,33 @@ PROMPT;
         return $this->enabled && $this->baseUrl !== '' && $this->model !== '';
     }
 
+    /**
+     * Redact high-confidence credential patterns from text before it leaves the
+     * box. Covers secrets that live in NON-sensitive memories (which masking by
+     * is_sensitive does not catch). Conservative: prefixed tokens + explicit
+     * key=value / "X is Y" secret assignments. Free-text secrets with no marker
+     * still require flagging the memory is_sensitive.
+     */
+    public function redactSecrets(string $text): string
+    {
+        $patterns = [
+            '/\b(?:ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9]{6,}/'                               => '[REDACTED:github-pat]',
+            '/\bgithub_pat_[A-Za-z0-9_]{20,}/'                                          => '[REDACTED:github-pat]',
+            '/\bsk-[A-Za-z0-9_\-]{12,}/'                                                => '[REDACTED:api-key]',
+            '/\bfrgo_[A-Za-z0-9]{12,}/'                                                 => '[REDACTED:frgo-token]',
+            '/\bAKIA[0-9A-Z]{16}\b/'                                                    => '[REDACTED:aws-key]',
+            '/\bxox[baprs]-[A-Za-z0-9\-]{10,}/'                                         => '[REDACTED:slack-token]',
+            '/-----BEGIN[A-Z ]+PRIVATE KEY-----[\s\S]*?-----END[A-Z ]+PRIVATE KEY-----/' => '[REDACTED:private-key]',
+            '/\bBearer\s+[A-Za-z0-9._\-]{20,}/i'                                        => 'Bearer [REDACTED]',
+            // key: value / key=value secret assignments
+            '/\b(pass(?:word|phrase|wd)?|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)\b\s*[:=]\s*["\'`]?[^\s"\'`]{4,}/i' => '$1: [REDACTED]',
+            // "password is X" / "passphrase is `X`"
+            '/\b(pass(?:word|phrase|wd)?|secret|token)\b(\s+is\s+)["\'`]?[^\s"\'`,;.]{4,}/i' => '$1$2[REDACTED]',
+        ];
+
+        return preg_replace(array_keys($patterns), array_values($patterns), $text);
+    }
+
     public function model(): string
     {
         return $this->model;
@@ -118,6 +145,12 @@ PROMPT;
                 'error'     => 'Consolidator is disabled or misconfigured. Set CONSOLIDATOR_ENABLED=true and CONSOLIDATOR_* in .env.',
             ];
         }
+
+        // Defence in depth: AgentMemory::toPublicArray only masks is_sensitive
+        // memories. Secrets embedded in NON-sensitive memories (config/fact
+        // notes) would otherwise reach the external LLM verbatim. Scrub known
+        // credential patterns from EVERY memory before the call.
+        $maskedMemories = $this->redactSecrets($maskedMemories);
 
         $userMsg = $queryContext
             ? "Retrieval context (the query these memories answer): \"{$queryContext}\"\n\n=== MEMORIES ===\n{$maskedMemories}"
