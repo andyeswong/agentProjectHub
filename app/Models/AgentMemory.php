@@ -14,18 +14,22 @@ class AgentMemory extends Model
 
     protected $fillable = [
         'workspace_id', 'created_by', 'last_updated_by',
-        'memory_key', 'type', 'label', 'content',
-        'value', 'tags', 'is_sensitive',
+        'memory_key', 'type', 'label', 'content', 'origin',
+        'value', 'tags', 'associations', 'integration_log', 'reinforced_count',
+        'is_sensitive',
         'embedding', 'embedding_model',
         'expires_at',
     ];
 
     protected $casts = [
-        'value'        => 'array',
-        'tags'         => 'array',
-        'embedding'    => 'array',
-        'is_sensitive' => 'boolean',
-        'expires_at'   => 'datetime',
+        'value'            => 'array',
+        'tags'             => 'array',
+        'associations'     => 'array',
+        'integration_log'  => 'array',
+        'reinforced_count' => 'integer',
+        'embedding'        => 'array',
+        'is_sensitive'     => 'boolean',
+        'expires_at'       => 'datetime',
     ];
 
     // Never serialized: the pgvector column and the transient search distance.
@@ -78,6 +82,15 @@ class AgentMemory extends Model
 
             // Redact content — may contain raw secrets the agent described
             $data['content'] = '[sensitive — click Reveal to view]';
+
+            // The integration log (error-trails/corrections) and origin may
+            // describe how a secret was reached — redact when masked.
+            if (!empty($data['integration_log'])) {
+                $data['integration_log'] = '[sensitive — click Reveal to view]';
+            }
+            if (!empty($data['origin'])) {
+                $data['origin'] = '[sensitive — click Reveal to view]';
+            }
         }
 
         $data['is_embedded'] = $this->isEmbedded();

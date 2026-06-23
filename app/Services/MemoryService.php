@@ -29,8 +29,10 @@ class MemoryService
             'type'            => $data['type'] ?? 'fact',
             'label'           => $data['label'],
             'content'         => $data['content'],
+            'origin'          => $data['origin'] ?? null,
             'value'           => $data['value'] ?? null,
             'tags'            => $data['tags'] ?? null,
+            'associations'    => $data['associations'] ?? null,
             'is_sensitive'    => $data['is_sensitive'] ?? false,
             'embedding'       => $embedding,
             'embedding_model' => $embeddingModel,
@@ -97,6 +99,64 @@ class MemoryService
         }
 
         return [$memory, $wasCreated];
+    }
+
+    /**
+     * Integrate (COMPLEMENT, never replace) new info into an existing memory.
+     * The original content is PRESERVED — the note is appended and recorded in
+     * integration_log (the error-trail / correction history). Re-embeds and
+     * bumps reinforced_count (the repetition/consolidation signal).
+     */
+    public function integrate(AgentMemory $memory, array $data, ApiKey $actor): AgentMemory
+    {
+        $note  = trim($data['note']);
+        $stamp = now()->toIso8601String();
+
+        // PRESERVE the original — append, do not overwrite.
+        $appended = rtrim($memory->content) . "\n\n[integrated {$stamp}] {$note}";
+
+        $log   = $memory->integration_log ?? [];
+        $log[] = ['at' => $stamp, 'by' => $actor->id, 'note' => $note];
+
+        // Merge association edges by target id (last weight wins).
+        $merged = $memory->associations ?? [];
+        if (!empty($data['associations']) && is_array($data['associations'])) {
+            $byId = [];
+            foreach (array_merge($merged, $data['associations']) as $a) {
+                if (!empty($a['id'])) {
+                    $byId[$a['id']] = $a;
+                }
+            }
+            $merged = array_values($byId);
+        }
+
+        $embedding = $this->embedder->embed($this->buildEmbedText([
+            'type'    => $memory->type,
+            'label'   => $memory->label,
+            'content' => $appended,
+            'tags'    => $memory->tags,
+        ]));
+
+        $memory->update([
+            'content'          => $appended,
+            'origin'           => $data['origin'] ?? $memory->origin,
+            'associations'     => $merged ?: null,
+            'integration_log'  => $log,
+            'reinforced_count' => ($memory->reinforced_count ?? 0) + 1,
+            'last_updated_by'  => $actor->id,
+            'embedding'        => $embedding,
+            'embedding_model'  => $embedding ? $this->embedder->model() : $memory->embedding_model,
+        ]);
+
+        $fresh = $memory->fresh(['creator', 'lastEditor']);
+
+        $this->events->record('memory.integrated', 'memory', $memory->id, $actor, [
+            'label'            => $fresh->label,
+            'note'             => mb_substr($note, 0, 200),
+            'reinforced_count' => $fresh->reinforced_count,
+        ]);
+
+        return $fresh;
     }
 
     /**
@@ -204,6 +264,9 @@ class MemoryService
         }
         if (!empty($data['content'])) {
             $parts[] = $data['content'];
+        }
+        if (!empty($data['origin'])) {
+            $parts[] = "Origin: {$data['origin']}";
         }
         if (!empty($data['tags'])) {
             $parts[] = 'Tags: ' . implode(', ', (array) $data['tags']);

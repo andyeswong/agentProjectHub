@@ -105,16 +105,21 @@ class MemoryController extends Controller
         }
 
         $data = $request->validate([
-            'workspace_id' => 'nullable|uuid',
-            'key'          => 'nullable|string|max:255',
-            'type'         => 'nullable|in:credential,domain,ip,fact,config,note,skill,other',
-            'label'        => 'required|string|max:255',
-            'content'      => 'required|string',
-            'value'        => 'nullable|array',
-            'tags'         => 'nullable|array',
-            'tags.*'       => 'string|max:50',
-            'is_sensitive' => 'nullable|boolean',
-            'expires_at'   => 'nullable|date',
+            'workspace_id'        => 'nullable|uuid',
+            'key'                 => 'nullable|string|max:255',
+            'type'                => 'nullable|in:credential,domain,ip,fact,config,note,skill,other',
+            'label'               => 'required|string|max:255',
+            'content'             => 'required|string',
+            'origin'              => 'nullable|string|max:500',
+            'value'               => 'nullable|array',
+            'tags'                => 'nullable|array',
+            'tags.*'              => 'string|max:50',
+            'associations'        => 'nullable|array',
+            'associations.*.id'   => 'required|uuid',
+            'associations.*.weight' => 'nullable|numeric',
+            'associations.*.note' => 'nullable|string|max:255',
+            'is_sensitive'        => 'nullable|boolean',
+            'expires_at'          => 'nullable|date',
         ]);
 
         if (!empty($data['key'])) {
@@ -198,6 +203,8 @@ class MemoryController extends Controller
                 'is_expired'     => $mem->isExpired(),
                 'is_embedded'    => $mem->isEmbedded(),
                 'embed_model'    => $mem->embedding_model,
+                'associated'     => $this->resolveAssociations($mem, $workspaceIds),
+                'reinforced_count' => $mem->reinforced_count,
                 'revealed'       => $mem->is_sensitive ? $canReveal : null,
                 'hint'           => $mem->is_sensitive && ! $canReveal
                     ? "This memory is sensitive and was returned MASKED — your API key lacks the 'reveal_secrets' capability. Ask your pilot to grant it."
@@ -478,6 +485,50 @@ class MemoryController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // POST /api/v1/memory/{id}/integrate
+    // COMPLEMENT a memory (append + record the correction/error-trail), NOT
+    // overwrite. The original content is preserved; the note is appended and
+    // logged in integration_log. Re-embeds, bumps reinforced_count. This is the
+    // "memories integrate, not replace" operation (vs PUT which overwrites).
+    // ─────────────────────────────────────────────────────────────────────
+    public function integrate(Request $request, string $id): JsonResponse
+    {
+        $apiKey        = $request->attributes->get('api_key');
+        [$workspaceIds] = $this->resolveWorkspaceIds($apiKey);
+
+        if (empty($workspaceIds)) {
+            return $this->noWorkspaceError();
+        }
+
+        $mem = AgentMemory::whereIn('workspace_id', $workspaceIds)->findOrFail($id);
+
+        $data = $request->validate([
+            'note'                  => 'required|string|min:1',
+            'origin'                => 'nullable|string|max:500',
+            'associations'          => 'nullable|array',
+            'associations.*.id'     => 'required|uuid',
+            'associations.*.weight' => 'nullable|numeric',
+            'associations.*.note'   => 'nullable|string|max:255',
+        ]);
+
+        $fresh = $this->memory->integrate($mem, $data, $apiKey);
+
+        return response()->json([
+            'status' => 'integrated',
+            'memory' => $fresh->toPublicArray(),
+            '_meta'  => [
+                'reinforced_count'  => $fresh->reinforced_count,
+                'integration_count' => is_array($fresh->integration_log) ? count($fresh->integration_log) : 0,
+                're_embedded'       => $fresh->isEmbedded(),
+                'hint'              => 'Original content was PRESERVED; your note was appended and recorded in integration_log. Nothing was overwritten.',
+            ],
+            'next_steps' => [
+                ['action' => 'View full history', 'method' => 'GET', 'endpoint' => "/api/v1/memory/{$id}"],
+            ],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // POST /api/v1/memory/consolidate   ⚠️ EXPERIMENTAL
     // Same retrieval as /search, but pipes the matched memories through an
     // LLM knowledge-consolidator (config: services.consolidator, prod default
@@ -673,6 +724,43 @@ class MemoryController extends Controller
 
             return empty($kept) ? '[src: unverified]' : '[src: ' . implode(', ', $kept) . ']';
         }, $knowledge);
+    }
+
+    /**
+     * Spreading activation (light): resolve a memory's association edges to
+     * {id, label, type, weight}, strongest first. These are the "associated
+     * thoughts" that co-activate when this memory is retrieved.
+     */
+    private function resolveAssociations(AgentMemory $mem, array $workspaceIds): array
+    {
+        $assoc = $mem->associations;
+        if (empty($assoc) || !is_array($assoc)) {
+            return [];
+        }
+
+        $byId = [];
+        foreach ($assoc as $a) {
+            if (!empty($a['id'])) {
+                $byId[$a['id']] = (float) ($a['weight'] ?? 1.0);
+            }
+        }
+        if (empty($byId)) {
+            return [];
+        }
+
+        $targets = AgentMemory::whereIn('workspace_id', $workspaceIds)
+            ->whereIn('id', array_keys($byId))
+            ->get(['id', 'memory_key', 'type', 'label']);
+
+        $out = $targets->map(fn ($t) => [
+            'id'     => $t->id,
+            'key'    => $t->memory_key,
+            'type'   => $t->type,
+            'label'  => $t->label,
+            'weight' => $byId[$t->id] ?? 1.0,
+        ])->sortByDesc('weight')->values()->all();
+
+        return $out;
     }
 
     private function noWorkspaceError(): JsonResponse

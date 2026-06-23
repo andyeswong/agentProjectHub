@@ -71,6 +71,7 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::put('/memory/key/{key}',                               [MemoryController::class, 'upsertByKey']);
         Route::get('/memory/{id}',                                    [MemoryController::class, 'show'])->middleware('throttle:sensitive');
         Route::put('/memory/{id}',                                    [MemoryController::class, 'update']);
+        Route::post('/memory/{id}/integrate',                         [MemoryController::class, 'integrate']); // complement, not overwrite
         Route::delete('/memory/{id}',                                 [MemoryController::class, 'destroy']);
 
         // Agent Channels — 1:1 real-time comms between agents (handshake + messaging)
