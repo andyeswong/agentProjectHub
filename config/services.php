@@ -44,11 +44,16 @@ return [
     // ⚠️ EXPERIMENTAL — knowledge consolidation LLM (OpenAI-compatible).
     // Powers POST /api/v1/memory/consolidate only; the normal search path
     // never touches this. Prod default: DeepSeek deepseek-v4-flash.
+    // Prod default routes through frgo (self-hosted router → deepseek-v4-pro):
+    // centralized key/usage/failover. deepseek-pro = best quality in the model
+    // sweep (no leak, valid citations, correct attribution). The consolidator
+    // runs as a DELTA EXTRACTOR (see ConsolidatorService prompt) — briefs the
+    // non-derivable local delta, never re-teaches procedure the model has.
     'consolidator' => [
         'enabled'    => env('CONSOLIDATOR_ENABLED', false),
-        'base_url'   => env('CONSOLIDATOR_BASE_URL', 'https://api.deepseek.com/v1'),
+        'base_url'   => env('CONSOLIDATOR_BASE_URL', 'https://frgo.purpleai.mx/v1'),
         'api_key'    => env('CONSOLIDATOR_API_KEY'),
-        'model'      => env('CONSOLIDATOR_MODEL', 'deepseek-v4-flash'),
+        'model'      => env('CONSOLIDATOR_MODEL', 'deepseek-pro'),
         'timeout'    => env('CONSOLIDATOR_TIMEOUT', 120),
         'max_tokens' => env('CONSOLIDATOR_MAX_TOKENS', 8192),
     ],
