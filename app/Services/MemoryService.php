@@ -187,7 +187,8 @@ class MemoryService
                 ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                 ->select([
                     'id', 'workspace_id', 'created_by', 'last_updated_by', 'memory_key',
-                    'type', 'label', 'content', 'value', 'tags', 'is_sensitive',
+                    'type', 'label', 'content', 'origin', 'value', 'tags',
+                    'associations', 'integration_log', 'reinforced_count', 'is_sensitive',
                     'embedding', 'embedding_model', 'expires_at', 'created_at', 'updated_at',
                 ])
                 ->selectRaw("(embedding_vec <=> {$literal}::vector) AS distance")
