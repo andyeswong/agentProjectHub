@@ -573,6 +573,7 @@ class MemoryController extends Controller
             'q'            => 'required|string|min:2',
             'limit'        => 'nullable|integer|min:1|max:50',
             'workspace_id' => 'nullable|uuid',
+            'model'        => 'nullable|string|max:64',
         ]);
 
         if (!$this->consolidator->enabled()) {
@@ -584,7 +585,7 @@ class MemoryController extends Controller
             ], 503);
         }
 
-        $limit  = $data['limit'] ?? 15;
+        $limit  = $data['limit'] ?? 10;
         $result = $this->memory->search($data['q'], $workspaceIds, $limit);
 
         // Retrieval (semantic, or keyword fallback if Ollama is down).
@@ -636,7 +637,7 @@ class MemoryController extends Controller
         }
         $maskedRaw = implode("\n\n", $blocks);
 
-        $out = $this->consolidator->consolidate($maskedRaw, $data['q']);
+        $out = $this->consolidator->consolidate($maskedRaw, $data['q'], $data['model'] ?? null);
 
         if (!$out['ok']) {
             return response()->json([

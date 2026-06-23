@@ -149,13 +149,15 @@ PROMPT;
      *
      * @return array{ok:bool, knowledge:?string, model:string, usage:?array, error:?string}
      */
-    public function consolidate(string $maskedMemories, ?string $queryContext = null): array
+    public function consolidate(string $maskedMemories, ?string $queryContext = null, ?string $modelOverride = null): array
     {
+        $model = $modelOverride ?: $this->model;
+
         if (!$this->enabled()) {
             return [
                 'ok'        => false,
                 'knowledge' => null,
-                'model'     => $this->model,
+                'model'     => $model,
                 'usage'     => null,
                 'error'     => 'Consolidator is disabled or misconfigured. Set CONSOLIDATOR_ENABLED=true and CONSOLIDATOR_* in .env.',
             ];
@@ -181,7 +183,7 @@ PROMPT;
             }
 
             $response = $request->post("{$this->baseUrl}/chat/completions", [
-                'model'       => $this->model,
+                'model'       => $model,
                 'temperature' => 0.2,
                 'max_tokens'  => $this->maxTokens,
                 'messages'    => [
@@ -198,7 +200,7 @@ PROMPT;
                 return [
                     'ok'        => false,
                     'knowledge' => null,
-                    'model'     => $this->model,
+                    'model'     => $model,
                     'usage'     => null,
                     'error'     => "Consolidator LLM returned HTTP {$response->status()}.",
                 ];
@@ -210,7 +212,7 @@ PROMPT;
                 return [
                     'ok'        => false,
                     'knowledge' => null,
-                    'model'     => $this->model,
+                    'model'     => $model,
                     'usage'     => null,
                     'error'     => 'Consolidator LLM returned an empty completion.',
                 ];
@@ -219,7 +221,7 @@ PROMPT;
             return [
                 'ok'        => true,
                 'knowledge' => trim($knowledge),
-                'model'     => $this->model,
+                'model'     => $model,
                 'usage'     => $response->json('usage'),
                 'error'     => null,
             ];
@@ -232,7 +234,7 @@ PROMPT;
             return [
                 'ok'        => false,
                 'knowledge' => null,
-                'model'     => $this->model,
+                'model'     => $model,
                 'usage'     => null,
                 'error'     => 'Could not reach the consolidator LLM endpoint.',
             ];
