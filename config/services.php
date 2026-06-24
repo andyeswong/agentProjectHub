@@ -58,6 +58,9 @@ return [
         'model'      => env('CONSOLIDATOR_MODEL', 'deepseek-flash'),
         'timeout'    => env('CONSOLIDATOR_TIMEOUT', 120),
         'max_tokens' => env('CONSOLIDATOR_MAX_TOKENS', 8192),
+        // DeepSeek-v4 only: send chat_template_kwargs.thinking=false to cut the
+        // reasoning latency that makes consolidate ~40s (trips client timeouts).
+        'disable_thinking' => env('CONSOLIDATOR_DISABLE_THINKING', true),
     ],
 
 ];

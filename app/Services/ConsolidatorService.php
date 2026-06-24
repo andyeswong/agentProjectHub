@@ -30,6 +30,7 @@ class ConsolidatorService
     private string $model;
     private int $timeout;
     private int $maxTokens;
+    private bool $disableThinking;
 
     private const SYSTEM_PROMPT = <<<'PROMPT'
 # ROLE
@@ -105,6 +106,7 @@ PROMPT;
         $this->model     = (string) config('services.consolidator.model');
         $this->timeout   = (int) config('services.consolidator.timeout', 120);
         $this->maxTokens = (int) config('services.consolidator.max_tokens', 4096);
+        $this->disableThinking = (bool) config('services.consolidator.disable_thinking', false);
     }
 
     public function enabled(): bool
@@ -182,7 +184,7 @@ PROMPT;
                 $request = $request->withToken($this->apiKey);
             }
 
-            $response = $request->post("{$this->baseUrl}/chat/completions", [
+            $payload = [
                 'model'       => $model,
                 'temperature' => 0.2,
                 'max_tokens'  => $this->maxTokens,
@@ -190,7 +192,17 @@ PROMPT;
                     ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
                     ['role' => 'user',   'content' => $userMsg],
                 ],
-            ]);
+            ];
+
+            // DeepSeek-v4: cut reasoning latency (the consolidate bottleneck —
+            // ~40s with thinking on). The delta-extraction is largely mechanical,
+            // so thinking adds latency without much quality. Provider-specific
+            // and ignored by non-deepseek endpoints that don't read it.
+            if ($this->disableThinking) {
+                $payload['chat_template_kwargs'] = ['thinking' => false];
+            }
+
+            $response = $request->post("{$this->baseUrl}/chat/completions", $payload);
 
             if ($response->failed()) {
                 Log::warning('ConsolidatorService: non-2xx from LLM', [
