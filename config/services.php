@@ -44,18 +44,18 @@ return [
     // ⚠️ EXPERIMENTAL — knowledge consolidation LLM (OpenAI-compatible).
     // Powers POST /api/v1/memory/consolidate only; the normal search path
     // never touches this. Prod default: DeepSeek deepseek-v4-flash.
-    // Routes through frgo (self-hosted router). DEFAULT model = deepseek-flash
-    // for RESPONSIVENESS: deepseek-pro is a reasoning model and takes ~35s on
-    // 10-memory sets, tripping client/MCP timeouts ("consolidator down"). flash
-    // (still deepseek-v4) is ~2-3x faster; the citation guard neutralizes its
-    // CoT-leak and the structured provenance[] is authoritative anyway. Callers
-    // who want pro's quality pass {model:"deepseek-pro"} per request.
-    // The consolidator runs as a DELTA EXTRACTOR (see ConsolidatorService).
+    // DIRECT to api.deepseek.com (NOT frgo): the consolidator needs a
+    // DETERMINISTIC model. frgo is a cost/context router — it ignores the
+    // requested model and reroutes big prompts to whatever fits (e.g. minimax),
+    // and 503s on transient provider blips. That's correct router behaviour, but
+    // wrong for a tool that must always be deepseek-v4-flash. The pre-send
+    // secret scrub (not frgo) is the egress protection. The consolidator runs as
+    // a DELTA EXTRACTOR (see ConsolidatorService).
     'consolidator' => [
         'enabled'    => env('CONSOLIDATOR_ENABLED', false),
-        'base_url'   => env('CONSOLIDATOR_BASE_URL', 'https://frgo.purpleai.mx/v1'),
+        'base_url'   => env('CONSOLIDATOR_BASE_URL', 'https://api.deepseek.com/v1'),
         'api_key'    => env('CONSOLIDATOR_API_KEY'),
-        'model'      => env('CONSOLIDATOR_MODEL', 'deepseek-flash'),
+        'model'      => env('CONSOLIDATOR_MODEL', 'deepseek-v4-flash'),
         'timeout'    => env('CONSOLIDATOR_TIMEOUT', 120),
         'max_tokens' => env('CONSOLIDATOR_MAX_TOKENS', 8192),
         // DeepSeek-v4 only: send chat_template_kwargs.thinking=false to cut the
