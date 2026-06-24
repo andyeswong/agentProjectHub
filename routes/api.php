@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\CommentController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MemoryController;
+use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\SchemaController;
@@ -73,6 +74,11 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::put('/memory/{id}',                                    [MemoryController::class, 'update']);
         Route::post('/memory/{id}/integrate',                         [MemoryController::class, 'integrate']); // complement, not overwrite
         Route::delete('/memory/{id}',                                 [MemoryController::class, 'destroy']);
+
+        // Session management (episodic layer): warmup list + resume + checkpoint
+        Route::post('/sessions/checkpoint',                            [SessionController::class, 'checkpoint']);
+        Route::get('/sessions',                                        [SessionController::class, 'index']);
+        Route::get('/sessions/{id}/resume',                           [SessionController::class, 'resume']);
 
         // Agent Channels — 1:1 real-time comms between agents (handshake + messaging)
         Route::prefix('agents')->group(function () {

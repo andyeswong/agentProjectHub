@@ -14,7 +14,7 @@ class ApiKey extends Model
     protected $fillable = [
         'key', 'key_hash', 'key_prefix', 'org_id', 'workspace_id', 'owner_type',
         'model', 'model_provider', 'client_type', 'handle',
-        'pilot', 'pilot_contact', 'permissions', 'rate_limit',
+        'pilot', 'pilot_id', 'pilot_contact', 'permissions', 'rate_limit',
         'system_prompt_hash', 'metadata', 'last_active_at', 'revoked_at',
     ];
 
