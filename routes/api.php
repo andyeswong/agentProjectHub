@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\CommentController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MemoryController;
+use App\Http\Controllers\Api\V1\PersonalityController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\ProjectController;
@@ -79,6 +80,12 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::post('/sessions/checkpoint',                            [SessionController::class, 'checkpoint']);
         Route::get('/sessions',                                        [SessionController::class, 'index']);
         Route::get('/sessions/{id}/resume',                           [SessionController::class, 'resume']);
+
+        // Personalities (identity layer): the SELF a stateless body wears.
+        // resolve = cascade core -> runtime -> channel for the calling body.
+        Route::post('/personalities/resolve',                         [PersonalityController::class, 'resolve']);
+        Route::post('/personalities',                                 [PersonalityController::class, 'upsert']);
+        Route::get('/personalities/{slug}',                           [PersonalityController::class, 'show']);
 
         // Agent Channels — 1:1 real-time comms between agents (handshake + messaging)
         Route::prefix('agents')->group(function () {
