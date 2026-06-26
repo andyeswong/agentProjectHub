@@ -9,7 +9,7 @@ import UiIcon from '@/Components/atoms/UiIcon.vue'
 import UiInput from '@/Components/atoms/UiInput.vue'
 import UiRule from '@/Components/atoms/UiRule.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
-import { router } from '@inertiajs/vue3'
+import { router, Link } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 
 const props = defineProps({
@@ -190,7 +190,7 @@ function fmt(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { mon
 
             <div class="flex-1 min-w-0">
               <div class="flex flex-wrap items-center gap-2 mb-1.5">
-                <span class="font-medium text-sm" style="color: var(--color-text-primary);">{{ memory.label }}</span>
+                <Link :href="`/memory/${memory.id}`" class="font-medium text-sm link-underline" style="color: var(--color-text-primary);">{{ memory.label }}</Link>
                 <UiBadge :tone="memory.type === 'credential' ? 'danger' : 'neutral'">{{ typeLabel(memory.type) }}</UiBadge>
                 <UiBadge v-if="showWorkspaceBadge && memory.workspace_id" tone="neutral">{{ workspaceMap[memory.workspace_id] ?? '—' }}</UiBadge>
                 <span v-if="memory.memory_key" class="text-xs px-1.5 py-0.5" style="background-color: var(--color-surface-base); color: var(--color-text-muted); font-family: var(--font-mono); border: 1px solid var(--color-surface-border);">{{ memory.memory_key }}</span>

@@ -106,6 +106,53 @@ class MemoryWebController extends Controller
         ]);
     }
 
+    // GET /memory/{id} — detail: content + related (spreading-activation) + integration history.
+    public function show(Request $request, string $id): Response
+    {
+        $apiKey = $request->attributes->get('pilot_api_key');
+        $allIds = Workspace::where('org_id', $apiKey->org_id)->pluck('id')->all();
+
+        $memory = AgentMemory::whereIn('workspace_id', $allIds)
+            ->with(['creator:id,model,pilot', 'lastEditor:id,model,pilot'])
+            ->findOrFail($id);
+
+        // Forward associations resolved to memory cards, strongest first.
+        $edges = collect($memory->associations ?? [])->filter(fn($a) => !empty($a['id']));
+        $relatedRows = AgentMemory::whereIn('workspace_id', $allIds)
+            ->whereIn('id', $edges->pluck('id')->all())
+            ->get()->keyBy('id');
+        $related = $edges->map(function ($a) use ($relatedRows) {
+            $m = $relatedRows->get($a['id']);
+            if (!$m) return null;
+            return [
+                'id' => $m->id, 'label' => $m->label, 'type' => $m->type,
+                'memory_key' => $m->memory_key, 'weight' => $a['weight'] ?? null,
+                'via' => $a['via'] ?? null, 'note' => $a['note'] ?? null,
+            ];
+        })->filter()->sortByDesc('weight')->values();
+
+        return Inertia::render('Memory/Show', [
+            'memory'  => $memory->toPublicArray(),
+            'related' => $related,
+        ]);
+    }
+
+    // POST /memory/{id}/integrate — pilot complements a memory (append note, no overwrite).
+    public function integrate(Request $request, string $id)
+    {
+        $apiKey = $request->attributes->get('pilot_api_key');
+        $allIds = Workspace::where('org_id', $apiKey->org_id)->pluck('id')->all();
+        $memory = AgentMemory::whereIn('workspace_id', $allIds)->findOrFail($id);
+
+        $data = $request->validate([
+            'note'   => 'required|string',
+            'origin' => 'nullable|string|max:200',
+        ]);
+
+        $this->memoryService->integrate($memory, $data, $apiKey);
+        return \Illuminate\Support\Facades\Redirect::route('memory.show', $memory->id);
+    }
+
     /**
      * Returns the full unmasked value of a sensitive memory.
      * Called via JS fetch from the Reveal button in the Vue page.

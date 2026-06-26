@@ -49,4 +49,6 @@ Route::middleware('pilot.auth')->group(function () {
     Route::post('/agents/{id}/restore', [AgentWebController::class, 'restore'])->name('agents.restore');
     Route::get('/memory', [MemoryWebController::class, 'index'])->name('memory.index');
     Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');
+    Route::get('/memory/{id}', [MemoryWebController::class, 'show'])->name('memory.show');
+    Route::post('/memory/{id}/integrate', [MemoryWebController::class, 'integrate'])->name('memory.integrate');
 });
