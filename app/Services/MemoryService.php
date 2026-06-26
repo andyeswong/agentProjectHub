@@ -21,6 +21,13 @@ class MemoryService
         $embedding      = $this->embedder->embed($this->buildEmbedText($data));
         $embeddingModel = $embedding ? $this->embedder->model() : null;
 
+        // Materialize [[wikilinks]] in the prose into association edges so they
+        // auto-fire on recall; explicit associations passed in take priority.
+        $associations = $this->mergeAssociations(
+            $data['associations'] ?? null,
+            $this->wikilinkEdges($data['content'] ?? '', $workspaceId),
+        );
+
         $memory = AgentMemory::create([
             'workspace_id'    => $workspaceId,
             'created_by'      => $actor->id,
@@ -32,7 +39,7 @@ class MemoryService
             'origin'          => $data['origin'] ?? null,
             'value'           => $data['value'] ?? null,
             'tags'            => $data['tags'] ?? null,
-            'associations'    => $data['associations'] ?? null,
+            'associations'    => $associations,
             'is_sensitive'    => $data['is_sensitive'] ?? false,
             'embedding'       => $embedding,
             'embedding_model' => $embeddingModel,
@@ -118,17 +125,14 @@ class MemoryService
         $log   = $memory->integration_log ?? [];
         $log[] = ['at' => $stamp, 'by' => $actor->id, 'note' => $note];
 
-        // Merge association edges by target id (last weight wins).
-        $merged = $memory->associations ?? [];
-        if (!empty($data['associations']) && is_array($data['associations'])) {
-            $byId = [];
-            foreach (array_merge($merged, $data['associations']) as $a) {
-                if (!empty($a['id'])) {
-                    $byId[$a['id']] = $a;
-                }
-            }
-            $merged = array_values($byId);
-        }
+        // Merge association edges (first writer wins): incoming manual edges
+        // override existing ones, and both override auto wikilink edges parsed
+        // from the appended prose (the new note may introduce fresh [[links]]).
+        $merged = $this->mergeAssociations(
+            $data['associations'] ?? null,
+            $memory->associations ?? null,
+            $this->wikilinkEdges($appended, $memory->workspace_id, $memory->id),
+        );
 
         $embedding = $this->embedder->embed($this->buildEmbedText([
             'type'    => $memory->type,
@@ -242,6 +246,68 @@ class MemoryService
             )
             ->limit($limit)
             ->get();
+    }
+
+    /**
+     * Parse [[memory_key]] wikilinks from content and resolve them to association
+     * edges within the same workspace. These are the latent associative thoughts
+     * authored in prose — materialized so spreadActivate() can auto-fire them.
+     * Self-links and unresolved keys are dropped. Weight defaults above the
+     * spread threshold (0.5) so an authored link fires by default.
+     *
+     * @return array<int,array{id:string,weight:float,note:string,via:string}>
+     */
+    public function wikilinkEdges(string $content, string $workspaceId, ?string $selfId = null, float $weight = 0.6): array
+    {
+        if (! preg_match_all('/\[\[([^\]\[]+)\]\]/', $content, $m)) {
+            return [];
+        }
+
+        $keys = array_values(array_unique(array_map('trim', $m[1])));
+        $keys = array_filter($keys, fn ($k) => $k !== '');
+        if (empty($keys)) {
+            return [];
+        }
+
+        $rows = AgentMemory::where('workspace_id', $workspaceId)
+            ->whereIn('memory_key', $keys)
+            ->get(['id', 'memory_key']);
+
+        $edges = [];
+        foreach ($rows as $r) {
+            if ($selfId !== null && $r->id === $selfId) {
+                continue;
+            }
+            $edges[] = [
+                'id'     => $r->id,
+                'weight' => $weight,
+                'note'   => "wikilink [[{$r->memory_key}]]",
+                'via'    => 'wikilink',
+            ];
+        }
+
+        return $edges;
+    }
+
+    /**
+     * Merge association edge sets by target id. Earlier sets win — a manually
+     * authored edge is never clobbered by an auto wikilink edge of the same id.
+     *
+     * @return array<int,array>|null
+     */
+    public function mergeAssociations(?array ...$sets): ?array
+    {
+        $byId = [];
+        foreach ($sets as $set) {
+            foreach (($set ?? []) as $a) {
+                if (empty($a['id']) || isset($byId[$a['id']])) {
+                    continue; // first writer wins
+                }
+                $byId[$a['id']] = $a;
+            }
+        }
+
+        return $byId ? array_values($byId) : null;
     }
 
     /**
