@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\AgentWebController;
+use App\Http\Controllers\Web\PersonalityWebController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\MemoryWebController;
 use App\Http\Controllers\Web\PilotSessionController;
@@ -43,6 +44,8 @@ Route::middleware('pilot.auth')->group(function () {
     Route::get('/tasks/{id}', [TaskWebController::class, 'show'])->name('tasks.show');
     Route::patch('/tasks/{id}', [TaskWebController::class, 'update'])->name('tasks.update');
     Route::post('/tasks/{id}/comments', [TaskWebController::class, 'comment'])->name('tasks.comment');
+    Route::get('/personalities', [PersonalityWebController::class, 'index'])->name('personalities.index');
+    Route::patch('/personality-layer/{id}', [PersonalityWebController::class, 'updateLayer'])->name('personalities.layer.update');
     Route::get('/agents', [AgentWebController::class, 'index'])->name('agents.index');
     Route::patch('/agents/{id}', [AgentWebController::class, 'update'])->name('agents.update');
     Route::post('/agents/{id}/revoke', [AgentWebController::class, 'revoke'])->name('agents.revoke');
