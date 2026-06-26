@@ -4,7 +4,6 @@ import { computed } from 'vue'
 import UiIcon from '@/Components/atoms/UiIcon.vue'
 import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
-import ThemeToggle from '@/Components/molecules/ThemeToggle.vue'
 
 const page  = usePage()
 const auth  = computed(() => page.props.auth)
@@ -29,12 +28,9 @@ const logout = () => router.post('/logout')
 
       <!-- Wordmark -->
       <div class="px-5 py-5" style="border-bottom: 1px solid var(--color-surface-border);">
-        <div class="flex items-center justify-between">
-          <span class="font-display text-2xl leading-none" style="letter-spacing: -0.02em;">
-            Project<span style="color: var(--color-accent);">Hub</span>
-          </span>
-          <ThemeToggle />
-        </div>
+        <span class="font-display text-2xl leading-none" style="letter-spacing: -0.02em;">
+          Project<span style="color: var(--color-accent);">Hub</span>
+        </span>
         <div class="mt-2"><UiLabel>Agent memory &amp; coordination</UiLabel></div>
       </div>
 
@@ -86,10 +82,7 @@ const logout = () => router.post('/logout')
       <!-- Mobile top bar -->
       <header class="md:hidden flex items-center justify-between px-4 h-14 shrink-0" style="border-bottom: 1px solid var(--color-surface-border);">
         <span class="font-display text-xl">Project<span style="color: var(--color-accent);">Hub</span></span>
-        <div class="flex items-center gap-3">
-          <ThemeToggle />
-          <UiStatusDot tone="success" />
-        </div>
+        <UiStatusDot tone="success" />
       </header>
 
       <!-- Flash -->
