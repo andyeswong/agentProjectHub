@@ -4,30 +4,118 @@
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
+@source '../**/*.vue';
 
+/* ─────────────────────────────────────────────────────────────────────────
+   ProjectHub — Bold Typography, themeable (dark editorial + light warm-paper).
+   Type IS the system. Radius 0. One solid vermillion accent, no glow.
+   ───────────────────────────────────────────────────────────────────────── */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-    --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --font-sans:    'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, monospace;
 
-    /* Surface layers */
-    --color-surface-base:     #0d0f14;
-    --color-surface-elevated: #151821;
-    --color-surface-border:   #1e2433;
-    --color-surface-hover:    #1a2030;
+    /* Sharp by intent — every radius collapses to 0. */
+    --radius-xs: 0px; --radius-sm: 0px; --radius-md: 0px; --radius-lg: 0px;
+    --radius-xl: 0px; --radius-2xl: 0px; --radius-3xl: 0px; --radius-4xl: 0px;
 
-    /* Text */
-    --color-text-primary:   #e2e8f0;
-    --color-text-secondary: #8899bb;
-    --color-text-muted:     #4a5568;
+    /* The accent is invariant across themes: solid vermillion, never a gradient. */
+    --color-accent:          #ff3d00;
+    --color-accent-strong:   #e23600;
+    --color-accent-contrast: #ffffff;
+}
 
-    /* Accent */
-    --color-accent:      #38bdf8;
-    --color-accent-glow: #0ea5e9;
+/* ── Dark (default — editorial) ─────────────────────────────────────────── */
+:root, :root[data-theme='dark'] {
+    --color-surface-base:     #0a0a0a;
+    --color-surface-elevated: #111111;
+    --color-surface-sunken:   #050505;
+    --color-surface-border:   #262626;
+    --color-surface-hover:    #1a1a1a;
 
-    /* Semantic */
+    --color-text-primary:   #fafafa;
+    --color-text-secondary: #a3a3a3;
+    --color-text-muted:     #6b6b6b;
+
     --color-success: #22c55e;
     --color-warning: #f59e0b;
     --color-danger:  #ef4444;
-    --color-neutral: #64748b;
+    --color-neutral: #737373;
+
+    --noise-opacity: 0.035;
+
+    /* legacy alias kept so older inline styles don't break */
+    --color-accent-glow: var(--color-accent);
+}
+
+/* ── Light (warm paper) ─────────────────────────────────────────────────── */
+:root[data-theme='light'] {
+    --color-surface-base:     #faf9f6;
+    --color-surface-elevated: #ffffff;
+    --color-surface-sunken:   #f1efe9;
+    --color-surface-border:   #d9d5cb;
+    --color-surface-hover:    #efece4;
+
+    --color-text-primary:   #0a0a0a;
+    --color-text-secondary: #57534e;
+    --color-text-muted:     #9a948b;
+
+    --color-success: #16a34a;
+    --color-warning: #b45309;
+    --color-danger:  #b91c1c;
+    --color-neutral: #78716c;
+
+    --noise-opacity: 0.05;
+    --color-accent-glow: var(--color-accent);
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+@layer base {
+    html { color-scheme: dark; }
+    :root[data-theme='light'] { color-scheme: light; }
+
+    body {
+        background-color: var(--color-surface-base);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Sharp everywhere, no soft shadows. */
+    * { border-radius: 0 !important; }
+
+    /* Display face for headings; tight, confident. */
+    h1, h2, h3, .font-display {
+        font-family: var(--font-display);
+        letter-spacing: -0.01em;
+    }
+
+    ::selection {
+        background-color: var(--color-accent);
+        color: var(--color-accent-contrast);
+    }
+
+    /* Editorial grain — a faint fractalNoise layer over the whole surface. */
+    body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: var(--noise-opacity);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+}
+
+/* ── Reusable primitives (used by atoms) ────────────────────────────────── */
+@layer components {
+    /* Animated underline for text-only buttons/links. */
+    .link-underline {
+        background-image: linear-gradient(var(--color-accent), var(--color-accent));
+        background-size: 0% 1px;
+        background-position: 0 100%;
+        background-repeat: no-repeat;
+        transition: background-size 150ms cubic-bezier(0.25, 0, 0, 1);
+    }
+    .link-underline:hover { background-size: 100% 1px; }
 }
