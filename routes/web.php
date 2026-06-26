@@ -36,8 +36,13 @@ Route::post('/logout', [PilotSessionController::class, 'destroy'])
 Route::middleware('pilot.auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/projects', [ProjectWebController::class, 'index'])->name('projects.index');
+    Route::post('/projects', [ProjectWebController::class, 'store'])->name('projects.store');
     Route::get('/projects/{id}', [ProjectWebController::class, 'show'])->name('projects.show');
+    Route::patch('/projects/{id}', [ProjectWebController::class, 'update'])->name('projects.update');
+    Route::post('/projects/{id}/tasks', [ProjectWebController::class, 'createTask'])->name('projects.tasks.create');
     Route::get('/tasks/{id}', [TaskWebController::class, 'show'])->name('tasks.show');
+    Route::patch('/tasks/{id}', [TaskWebController::class, 'update'])->name('tasks.update');
+    Route::post('/tasks/{id}/comments', [TaskWebController::class, 'comment'])->name('tasks.comment');
     Route::get('/agents', [AgentWebController::class, 'index'])->name('agents.index');
     Route::get('/memory', [MemoryWebController::class, 'index'])->name('memory.index');
     Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');

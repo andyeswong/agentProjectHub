@@ -4,6 +4,8 @@ import UiHeading from '@/Components/atoms/UiHeading.vue'
 import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiCard from '@/Components/atoms/UiCard.vue'
 import UiBadge from '@/Components/atoms/UiBadge.vue'
+import UiButton from '@/Components/atoms/UiButton.vue'
+import UiIcon from '@/Components/atoms/UiIcon.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 
@@ -15,6 +17,20 @@ function applyFilter(status) {
 }
 const tabs = [{ label: 'All', value: '' }, { label: 'Active', value: 'active' }, { label: 'Archived', value: 'archived' }]
 const pct = (c) => c.total > 0 ? Math.round((c.done / c.total) * 100) : 0
+const PLUS = 'M12 4v16m8-8H4'
+
+const adding = ref(false)
+const form = ref({ name: '', description: '' })
+const creating = ref(false)
+function createProject() {
+  if (!form.value.name.trim() || creating.value) return
+  creating.value = true
+  router.post('/projects', form.value, {
+    preserveScroll: true,
+    onSuccess: () => { form.value = { name: '', description: '' }; adding.value = false },
+    onFinish: () => creating.value = false,
+  })
+}
 </script>
 
 <template>
@@ -27,16 +43,30 @@ const pct = (c) => c.total > 0 ? Math.round((c.done / c.total) * 100) : 0
           <UiLabel>Workspaces</UiLabel>
           <UiHeading :level="1" class="mt-1">Projects</UiHeading>
         </div>
-        <div class="flex gap-px shrink-0" style="background-color: var(--color-surface-border);">
-          <button v-for="opt in tabs" :key="opt.value" @click="applyFilter(opt.value)"
-            class="px-3 py-2 text-xs uppercase tracking-wider font-medium transition-colors"
-            :style="statusFilter === opt.value
-              ? 'background-color: var(--color-accent); color: var(--color-accent-contrast);'
-              : 'background-color: var(--color-surface-elevated); color: var(--color-text-muted);'">
-            {{ opt.label }}
-          </button>
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="flex gap-px" style="background-color: var(--color-surface-border);">
+            <button v-for="opt in tabs" :key="opt.value" @click="applyFilter(opt.value)"
+              class="px-3 py-2 text-xs uppercase tracking-wider font-medium transition-colors"
+              :style="statusFilter === opt.value
+                ? 'background-color: var(--color-accent); color: var(--color-accent-contrast);'
+                : 'background-color: var(--color-surface-elevated); color: var(--color-text-muted);'">
+              {{ opt.label }}
+            </button>
+          </div>
+          <UiButton variant="outline" size="sm" @click="adding = !adding"><UiIcon :path="PLUS" :size="14" /> New</UiButton>
         </div>
       </header>
+
+      <!-- New-project composer -->
+      <div v-if="adding" class="p-4 flex flex-col md:flex-row gap-2" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); box-shadow: inset 2px 0 0 var(--color-accent);">
+        <input v-model="form.name" placeholder="Project name…" @keydown.enter="createProject"
+          class="md:w-64 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border);"
+          @focus="$event.target.style.borderColor='var(--color-accent)'" @blur="$event.target.style.borderColor='var(--color-surface-border)'" />
+        <input v-model="form.description" placeholder="Description (optional)…"
+          class="flex-1 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border);"
+          @focus="$event.target.style.borderColor='var(--color-accent)'" @blur="$event.target.style.borderColor='var(--color-surface-border)'" />
+        <UiButton variant="solid" size="sm" :disabled="creating || !form.name.trim()" @click="createProject">{{ creating ? 'Creating…' : 'Create' }}</UiButton>
+      </div>
 
       <UiCard v-if="projects.length === 0" pad="p-10">
         <p class="text-center text-sm" style="color: var(--color-text-muted);">No projects found.</p>
