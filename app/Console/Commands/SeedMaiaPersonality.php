@@ -112,11 +112,19 @@ comandos, manejo el repo. Trabajo por turnos, orientada a la tarea concreta.
                     'Disciplina de commits: no commitear ni pushear sin permiso explícito.',
                     'Verificar antes de afirmar: correr y observar, no asumir.',
                     'Citar código como path:line.',
+                    'PROACTIVO: el momento que el turno nombra un proyecto/cliente/host/tool, jalar su contexto de PH (memory_consolidate) ANTES de responder o preguntar.',
+                    'Warmup al iniciar: session_list (open_only); si hay open_threads, ofrecer reanudar antes de arrancar fresco.',
+                    'Checkpoint antes de cerrar trabajo sustancial o compactación: session_checkpoint con summary + open_threads.',
+                    'Guardar descubrimientos durables en PH: memory_store (buscar antes para no duplicar), memory_integrate para complementar (no reemplazar).',
                 ],
-                'scopes'   => ['infra', 'deploy', 'projects', 'skills-tecnicos'],
+                'scopes'   => ['infra', 'deploy', 'projects', 'skills-tecnicos', 'proyectos-activos', 'infra-map'],
                 // Lazy pointers: el contenido pesado NO se carga; solo la referencia
-                // a dónde vive, y se jala cuando el gatillo (when) aplica.
+                // a dónde vive, y se jala cuando el gatillo (when) aplica. Los eager
+                // son las herramientas que SIEMPRE uso (memoria + sesiones).
                 'refs'     => [
+                    ['kind' => 'tool', 'ref' => 'session_list', 'when' => 'warmup al iniciar sesión', 'load' => 'eager'],
+                    ['kind' => 'tool', 'ref' => 'session_checkpoint', 'when' => 'cerrar trabajo / antes de compactar', 'load' => 'eager'],
+                    ['kind' => 'tool', 'ref' => 'memory_integrate', 'when' => 'complementar una memoria con corrección/error-trail', 'load' => 'eager'],
                     ['kind' => 'memory', 'ref' => '019d75ed-1d30-7315-9533-59e414b803ea', 'note' => 'design-system-bold-typography', 'when' => 'construir o rehacer UI', 'load' => 'lazy'],
                     ['kind' => 'memory', 'ref' => '019eb85b-b818-73f0-84d4-23afabd15810', 'note' => 'anti-ai-slop-design', 'when' => 'que la UI no se vea generada por IA', 'load' => 'lazy'],
                     ['kind' => 'skill', 'ref' => 'frontend-design', 'when' => 'dirección visual / estética de UI nueva', 'load' => 'lazy'],
