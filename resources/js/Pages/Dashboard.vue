@@ -52,7 +52,7 @@ const shortModel = (m) => m ? m.split('-').slice(0, 3).join('-') : '—'
 
 <template>
   <AppLayout>
-    <div class="max-w-6xl space-y-10">
+    <div class="space-y-10">
 
       <!-- ── Masthead (left-aligned, editorial) ── -->
       <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">

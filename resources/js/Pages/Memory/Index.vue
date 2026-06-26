@@ -80,7 +80,7 @@ function fmt(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { mon
 
 <template>
   <AppLayout>
-    <div class="max-w-6xl space-y-8">
+    <div class="space-y-8">
 
       <!-- ── Masthead ── -->
       <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

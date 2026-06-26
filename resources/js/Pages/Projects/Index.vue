@@ -19,7 +19,7 @@ const pct = (c) => c.total > 0 ? Math.round((c.done / c.total) * 100) : 0
 
 <template>
   <AppLayout>
-    <div class="max-w-6xl space-y-8">
+    <div class="space-y-8">
 
       <!-- Masthead -->
       <header class="flex items-end justify-between gap-4">
