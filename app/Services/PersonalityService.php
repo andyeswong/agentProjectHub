@@ -77,6 +77,7 @@ class PersonalityService
         $scopes  = [];
         $tools   = [];
         $rules   = [];
+        $refs    = [];
         $meta    = [];
         $layers  = [];
 
@@ -93,6 +94,7 @@ class PersonalityService
             $scopes = array_merge($scopes, $p->scopes ?? []);
             $tools  = array_merge($tools, $p->tools ?? []);
             $rules  = array_merge($rules, $p->rules ?? []);
+            $refs   = array_merge($refs, $p->refs ?? []);
             // meta: shallow merge, deeper wins per key.
             $meta = array_merge($meta, $p->meta ?? []);
 
@@ -113,6 +115,7 @@ class PersonalityService
             'scopes'      => array_values(array_unique($scopes)),
             'tools'       => array_values(array_unique($tools)),
             'rules'       => $this->dedupePreserveOrder($rules),
+            'refs'        => $this->dedupeRefs($refs),
             'meta'        => $meta,
             'resolved_for'=> ['client_type' => $clientType, 'channel' => $channel],
             'layers'      => $layers,                       // provenance: what merged
@@ -135,6 +138,24 @@ class PersonalityService
             $missing[] = "channel:{$clientType}/{$channel}";
         }
         return $missing;
+    }
+
+    /**
+     * Dedupe typed reference pointers by (kind + ref). Deeper layers override
+     * a shallower pointer to the same artifact (refine its `when`/`load`), but
+     * the artifact appears once. Malformed entries (no ref) are dropped.
+     */
+    private function dedupeRefs(array $refs): array
+    {
+        $byKey = [];
+        foreach ($refs as $r) {
+            if (! is_array($r) || empty($r['ref'])) {
+                continue;
+            }
+            $key = ($r['kind'] ?? 'memory') . ':' . $r['ref'];
+            $byKey[$key] = $r; // last (deepest) wins
+        }
+        return array_values($byKey);
     }
 
     /** Dedupe a list of strings keeping first occurrence order. */

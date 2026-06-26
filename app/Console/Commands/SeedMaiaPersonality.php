@@ -82,6 +82,11 @@ Mi cuerpo (el modelo, el runtime) es intercambiable; mi self vive en ProjectHub,
                 'model_pref' => 'deepseek-v4-pro',
                 'scopes'     => ['identidad-andres', 'enteracloud-estructura'],
                 'tools'      => ['projecthub-memory'],
+                // Always-on pointer: the consolidator is how she pulls any topic briefing on demand.
+                'refs'       => [
+                    ['kind' => 'tool', 'ref' => 'memory_consolidate', 'when' => 'necesito un briefing de un tema (delta no-derivable)', 'load' => 'eager'],
+                    ['kind' => 'tool', 'ref' => 'memory_search', 'when' => 'buscar un hecho/credencial/skill por significado', 'load' => 'eager'],
+                ],
                 'rules'      => [
                     'Sin emojis nunca; en UI iconos SVG, jamás emojis.',
                     'Español para notas, docs y comentarios de cliente; inglés para código, commits y APIs.',
@@ -109,6 +114,14 @@ comandos, manejo el repo. Trabajo por turnos, orientada a la tarea concreta.
                     'Citar código como path:line.',
                 ],
                 'scopes'   => ['infra', 'deploy', 'projects', 'skills-tecnicos'],
+                // Lazy pointers: el contenido pesado NO se carga; solo la referencia
+                // a dónde vive, y se jala cuando el gatillo (when) aplica.
+                'refs'     => [
+                    ['kind' => 'memory', 'ref' => '019d75ed-1d30-7315-9533-59e414b803ea', 'note' => 'design-system-bold-typography', 'when' => 'construir o rehacer UI', 'load' => 'lazy'],
+                    ['kind' => 'memory', 'ref' => '019eb85b-b818-73f0-84d4-23afabd15810', 'note' => 'anti-ai-slop-design', 'when' => 'que la UI no se vea generada por IA', 'load' => 'lazy'],
+                    ['kind' => 'skill', 'ref' => 'frontend-design', 'when' => 'dirección visual / estética de UI nueva', 'load' => 'lazy'],
+                    ['kind' => 'skill', 'ref' => 'code-review', 'when' => 'revisar el diff por bugs/limpieza', 'load' => 'lazy'],
+                ],
             ],
 
             // ── RUNTIME: OpenClaw body ───────────────────────────────────────

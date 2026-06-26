@@ -20,7 +20,7 @@ class Personality extends Model
     protected $fillable = [
         'workspace_id', 'slug', 'name', 'parent_id', 'level',
         'match_client_type', 'match_channel',
-        'soul', 'register', 'model_pref', 'scopes', 'tools', 'rules', 'meta',
+        'soul', 'register', 'model_pref', 'scopes', 'tools', 'rules', 'refs', 'meta',
         'status', 'version', 'created_by', 'last_updated_by',
     ];
 
@@ -28,6 +28,7 @@ class Personality extends Model
         'scopes'  => 'array',
         'tools'   => 'array',
         'rules'   => 'array',
+        'refs'    => 'array',
         'meta'    => 'array',
         'version' => 'integer',
     ];
