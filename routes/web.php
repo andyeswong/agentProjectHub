@@ -44,6 +44,9 @@ Route::middleware('pilot.auth')->group(function () {
     Route::patch('/tasks/{id}', [TaskWebController::class, 'update'])->name('tasks.update');
     Route::post('/tasks/{id}/comments', [TaskWebController::class, 'comment'])->name('tasks.comment');
     Route::get('/agents', [AgentWebController::class, 'index'])->name('agents.index');
+    Route::patch('/agents/{id}', [AgentWebController::class, 'update'])->name('agents.update');
+    Route::post('/agents/{id}/revoke', [AgentWebController::class, 'revoke'])->name('agents.revoke');
+    Route::post('/agents/{id}/restore', [AgentWebController::class, 'restore'])->name('agents.restore');
     Route::get('/memory', [MemoryWebController::class, 'index'])->name('memory.index');
     Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');
 });
