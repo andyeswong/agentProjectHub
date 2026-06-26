@@ -123,8 +123,8 @@ const inviteOpen = ref(false)
                                         <p v-if="agent.system_prompt_hash" class="text-xs mt-0.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ agent.system_prompt_hash }}</p>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <span class="text-xs px-2 py-0.5 rounded-full"
-                                            :style="{ backgroundColor: (providerColor[agent.model_provider] ?? 'var(--color-neutral)') + '20', color: providerColor[agent.model_provider] ?? 'var(--color-neutral)' }">
+                                        <span class="text-[0.65rem] uppercase tracking-wider px-1.5 py-0.5"
+                                            style="font-family: var(--font-mono); color: var(--color-text-secondary); border: 1px solid var(--color-surface-border);">
                                             {{ agent.model_provider ?? '—' }}
                                         </span>
                                     </td>
