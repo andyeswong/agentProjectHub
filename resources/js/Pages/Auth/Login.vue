@@ -64,7 +64,7 @@ function copyHelp() {
 
                 <!-- Auto-login processing indicator -->
                 <div v-if="autoAttempted && !tokenError" class="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2"
-                    style="background-color: rgba(56,189,248,0.08); color: var(--color-accent); border: 1px solid rgba(56,189,248,0.2);">
+                    style="background-color: var(--color-surface-sunken); color: var(--color-accent); border: 1px solid var(--color-surface-border);">
                     <svg class="w-4 h-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
@@ -106,7 +106,7 @@ function copyHelp() {
                         type="submit"
                         :disabled="form.processing"
                         class="w-full py-3 rounded-lg text-sm font-medium transition-opacity"
-                        style="background-color: var(--color-accent); color: #0d0f14;"
+                        style="background-color: var(--color-accent); color: var(--color-accent-contrast);"
                         :style="form.processing ? 'opacity:0.6' : ''"
                     >
                         {{ form.processing ? 'Connecting...' : 'Connect to Agent' }}
@@ -117,7 +117,7 @@ function copyHelp() {
                 <button @click="helpOpen = !helpOpen"
                     class="mt-5 w-full flex items-center justify-between text-xs px-4 py-2.5 rounded-lg transition-colors"
                     :style="helpOpen
-                        ? 'background-color: rgba(56,189,248,0.08); color: var(--color-accent); border: 1px solid rgba(56,189,248,0.2);'
+                        ? 'background-color: var(--color-surface-sunken); color: var(--color-accent); border: 1px solid var(--color-surface-border);'
                         : 'background-color: var(--color-surface-base); color: var(--color-text-muted); border: 1px solid var(--color-surface-border);'">
                     <span class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -148,10 +148,10 @@ function copyHelp() {
                         'Copy the <code>plt_...</code> token from the agent\'s response',
                         'Paste it in the field above and click Connect',
                     ]" :key="i" class="flex items-start gap-3">
-                        <span class="shrink-0 mt-0.5 w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold"
-                            style="background-color: rgba(56,189,248,0.15); color: var(--color-accent);">{{ i + 1 }}</span>
+                        <span class="shrink-0 mt-0.5 w-5 h-5 text-xs flex items-center justify-center font-bold tabular-nums"
+                            style="border: 1px solid var(--color-surface-border); color: var(--color-accent); font-family: var(--font-mono);">{{ i + 1 }}</span>
                         <span class="text-xs" style="color: var(--color-text-secondary);"
-                            v-html="item.replace(/<code>/g, '<code style=\'font-family: var(--font-mono); color: var(--color-accent); background: rgba(56,189,248,0.08); padding: 1px 5px; border-radius: 4px;\'>').replace(/<\/code>/g, '</code>')"></span>
+                            v-html="item.replace(/<code>/g, '<code style=\'font-family: var(--font-mono); color: var(--color-accent); background: var(--color-surface-base); padding: 1px 5px;\'>').replace(/<\/code>/g, '</code>')"></span>
                     </div>
                 </div>
 

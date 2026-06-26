@@ -81,13 +81,13 @@ function copyPrompt() {
 </script>
 
 <template>
-    <div class="rounded-xl overflow-hidden" style="border: 1px solid rgba(56,189,248,0.25); background-color: var(--color-surface-elevated);">
+    <div class="overflow-hidden" style="border: 1px solid var(--color-surface-border); background-color: var(--color-surface-elevated); box-shadow: inset 2px 0 0 var(--color-accent);">
 
         <!-- Header -->
         <div class="flex items-center gap-3 px-6 py-4"
-            style="border-bottom: 1px solid var(--color-surface-border); background-color: rgba(56,189,248,0.04);">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style="background-color: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.2);">
+            style="border-bottom: 1px solid var(--color-surface-border); background-color: var(--color-surface-sunken);">
+            <div class="w-8 h-8 flex items-center justify-center shrink-0"
+                style="border: 1px solid var(--color-surface-border);">
                 <svg class="w-4 h-4" style="color: var(--color-accent);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
@@ -134,7 +134,7 @@ function copyPrompt() {
                             @click="invite.provider = p.value; invite.model = ''"
                             class="px-3 py-1.5 rounded-lg text-xs transition-all"
                             :style="invite.provider === p.value
-                                ? 'background-color: rgba(56,189,248,0.15); border: 1px solid var(--color-accent); color: var(--color-accent);'
+                                ? 'background-color: var(--color-accent); border: 1px solid var(--color-accent); color: var(--color-accent-contrast);'
                                 : 'background-color: var(--color-surface-base); border: 1px solid var(--color-surface-border); color: var(--color-text-secondary);'">
                             {{ p.label }}
                         </button>
@@ -158,7 +158,7 @@ function copyPrompt() {
                             @click="togglePerm(perm.value)"
                             class="text-xs px-2.5 py-1 rounded-full transition-all"
                             :style="invite.permissions.includes(perm.value)
-                                ? 'background-color: rgba(56,189,248,0.15); border: 1px solid var(--color-accent); color: var(--color-accent);'
+                                ? 'background-color: var(--color-accent); border: 1px solid var(--color-accent); color: var(--color-accent-contrast);'
                                 : 'background-color: var(--color-surface-base); border: 1px solid var(--color-surface-border); color: var(--color-text-secondary);'">
                             {{ perm.label }}
                         </button>
@@ -195,16 +195,16 @@ function copyPrompt() {
             </div>
         </div>
 
-        <!-- Footer -->
-        <div class="px-4 md:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" style="border-top: 1px solid var(--color-surface-border); background-color: rgba(56,189,248,0.02);">
-            <div v-for="(item, i) in [
-                { icon: '📋', text: 'Colleague pastes this into their AI agent' },
-                { icon: '🔑', text: 'Agent registers and gets an API key for this org' },
-                { icon: '🎫', text: 'Agent generates a pilot token for the colleague' },
-                { icon: '✅', text: 'Colleague logs in at /login with their token' },
-            ]" :key="i" class="flex items-center gap-2 text-xs" style="color: var(--color-text-muted);">
-                <span>{{ item.icon }}</span>
-                <span>{{ item.text }}</span>
+        <!-- Footer — numbered flow -->
+        <div class="px-4 md:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style="border-top: 1px solid var(--color-surface-border); background-color: var(--color-surface-border);">
+            <div v-for="(text, i) in [
+                'Colleague pastes this into their AI agent',
+                'Agent registers and gets an API key for this org',
+                'Agent generates a pilot token for the colleague',
+                'Colleague logs in at /login with their token',
+            ]" :key="i" class="flex items-start gap-2 text-xs px-3 py-2" style="background-color: var(--color-surface-elevated); color: var(--color-text-muted);">
+                <span class="tabular-nums shrink-0" style="font-family: var(--font-mono); color: var(--color-accent);">{{ String(i + 1).padStart(2, '0') }}</span>
+                <span>{{ text }}</span>
             </div>
         </div>
     </div>

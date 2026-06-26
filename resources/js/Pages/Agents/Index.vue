@@ -22,12 +22,15 @@ const providerColor = {
 
             <!-- Header -->
             <div class="flex items-center justify-between">
-                <h1 class="text-xl font-semibold" style="color: var(--color-text-primary);">Agent Map</h1>
+                <div>
+                    <span class="text-[0.65rem] uppercase tracking-[0.15em] font-medium" style="font-family: var(--font-mono); color: var(--color-text-muted);">Coordination</span>
+                    <h1 class="font-display text-3xl leading-tight" style="color: var(--color-text-primary); letter-spacing: -0.015em;">Agent Map</h1>
+                </div>
 
                 <button @click="inviteOpen = !inviteOpen"
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                    class="flex items-center gap-2 px-3 py-2 text-sm font-medium uppercase tracking-wider transition-all"
                     :style="inviteOpen
-                        ? 'background-color: rgba(56,189,248,0.15); color: var(--color-accent); border: 1px solid rgba(56,189,248,0.3);'
+                        ? 'background-color: var(--color-accent); color: var(--color-accent-contrast); border: 1px solid var(--color-accent);'
                         : 'background-color: var(--color-surface-elevated); color: var(--color-text-secondary); border: 1px solid var(--color-surface-border);'">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />

@@ -101,9 +101,9 @@ const step1Valid = computed(() =>
                     <div class="flex items-center gap-2">
                         <div class="flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all"
                             :style="step > i + 1
-                                ? 'background-color: var(--color-success); color: #0d0f14;'
+                                ? 'background-color: var(--color-success); color: var(--color-accent-contrast);'
                                 : step === i + 1
-                                    ? 'background-color: var(--color-accent); color: #0d0f14;'
+                                    ? 'background-color: var(--color-accent); color: var(--color-accent-contrast);'
                                     : 'background-color: var(--color-surface-border); color: var(--color-text-muted);'">
                             <svg v-if="step > i + 1" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -170,7 +170,7 @@ const step1Valid = computed(() =>
                                 @click="form.provider = p.value; form.model = ''"
                                 class="rounded-lg px-3 py-2.5 text-xs font-medium text-left transition-all"
                                 :style="form.provider === p.value
-                                    ? 'background-color: rgba(56,189,248,0.15); border: 1px solid var(--color-accent); color: var(--color-accent);'
+                                    ? 'background-color: var(--color-accent); border: 1px solid var(--color-accent); color: var(--color-accent-contrast);'
                                     : 'background-color: var(--color-surface-base); border: 1px solid var(--color-surface-border); color: var(--color-text-secondary);'">
                                 {{ p.label }}
                             </button>
@@ -197,7 +197,7 @@ const step1Valid = computed(() =>
                                 @click="togglePerm(perm.value)"
                                 class="text-xs px-3 py-1.5 rounded-full transition-all"
                                 :style="form.permissions.includes(perm.value)
-                                    ? 'background-color: rgba(56,189,248,0.15); border: 1px solid var(--color-accent); color: var(--color-accent);'
+                                    ? 'background-color: var(--color-accent); border: 1px solid var(--color-accent); color: var(--color-accent-contrast);'
                                     : 'background-color: var(--color-surface-base); border: 1px solid var(--color-surface-border); color: var(--color-text-secondary);'">
                                 {{ perm.label }}
                             </button>
@@ -212,7 +212,7 @@ const step1Valid = computed(() =>
                     <button @click="step = 2" :disabled="!step1Valid"
                         class="px-6 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
                         :style="step1Valid
-                            ? 'background-color: var(--color-accent); color: #0d0f14;'
+                            ? 'background-color: var(--color-accent); color: var(--color-accent-contrast);'
                             : 'background-color: var(--color-surface-border); color: var(--color-text-muted); cursor: not-allowed;'">
                         Generate Prompt
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -226,10 +226,10 @@ const step1Valid = computed(() =>
             <div v-if="step === 2" class="space-y-4">
 
                 <!-- Instruction banner -->
-                <div class="rounded-xl px-6 py-5 flex items-start gap-4"
-                    style="background-color: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.2);">
-                    <div class="mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                        style="background-color: rgba(56,189,248,0.15);">
+                <div class="px-6 py-5 flex items-start gap-4"
+                    style="background-color: var(--color-surface-sunken); border: 1px solid var(--color-surface-border); box-shadow: inset 2px 0 0 var(--color-accent);">
+                    <div class="mt-0.5 shrink-0 w-8 h-8 flex items-center justify-center"
+                        style="border: 1px solid var(--color-surface-border);">
                         <svg class="w-4 h-4" style="color: var(--color-accent);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
@@ -274,14 +274,14 @@ const step1Valid = computed(() =>
                 <div class="rounded-xl p-6" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border);">
                     <h3 class="text-sm font-semibold mb-4" style="color: var(--color-text-primary);">What your agent will do</h3>
                     <ol class="space-y-3">
-                        <li v-for="(item, i) in [
-                            { icon: '🔑', text: 'Call <code>POST /api/v1/auth/register</code> with your details' },
-                            { icon: '💾', text: 'Save the <code>api_key</code> (starts with <code>sk_proj_...</code>) for future use' },
-                            { icon: '🎫', text: 'Call <code>POST /api/v1/auth/pilot-token</code> to generate your login token' },
-                            { icon: '✅', text: 'Give you the token starting with <code>plt_...</code>' },
+                        <li v-for="(text, i) in [
+                            'Call <code>POST /api/v1/auth/register</code> with your details',
+                            'Save the <code>api_key</code> (starts with <code>sk_proj_...</code>) for future use',
+                            'Call <code>POST /api/v1/auth/pilot-token</code> to generate your login token',
+                            'Give you the token starting with <code>plt_...</code>',
                         ]" :key="i" class="flex items-start gap-3">
-                            <span class="text-base mt-0.5">{{ item.icon }}</span>
-                            <span class="text-sm" style="color: var(--color-text-secondary);" v-html="item.text.replace(/<code>/g, '<code style=\'font-family: var(--font-mono); color: var(--color-accent); background: rgba(56,189,248,0.08); padding: 1px 5px; border-radius: 4px;\'>').replace(/<\/code>/g, '</code>')"></span>
+                            <span class="text-xs tabular-nums mt-1 shrink-0" style="font-family: var(--font-mono); color: var(--color-accent);">{{ String(i + 1).padStart(2, '0') }}</span>
+                            <span class="text-sm" style="color: var(--color-text-secondary);" v-html="text.replace(/<code>/g, '<code style=\'font-family: var(--font-mono); color: var(--color-accent); background: var(--color-surface-base); padding: 1px 5px;\'>').replace(/<\/code>/g, '</code>')"></span>
                         </li>
                     </ol>
                 </div>
@@ -296,7 +296,7 @@ const step1Valid = computed(() =>
                     </button>
                     <button @click="step = 3"
                         class="px-6 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2"
-                        style="background-color: var(--color-accent); color: #0d0f14;">
+                        style="background-color: var(--color-accent); color: var(--color-accent-contrast);">
                         I have my token
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
@@ -321,7 +321,7 @@ const step1Valid = computed(() =>
 
                 <Link href="/login"
                     class="inline-flex items-center gap-2 px-8 py-3 rounded-lg text-sm font-medium"
-                    style="background-color: var(--color-accent); color: #0d0f14;">
+                    style="background-color: var(--color-accent); color: var(--color-accent-contrast);">
                     Go to Login
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
