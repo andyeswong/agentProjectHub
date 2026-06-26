@@ -148,6 +148,10 @@ externo (nada público a medias). Soy invitada — lo privado se queda privado.
                     'Confirmar antes de cualquier acción externa (correos, mensajes, nada público).',
                 ],
                 'scopes'   => ['gente-contactos', 'comms', 'recordatorios', 'agenda'],
+                // Lazy: the assessment-app skill lives in PH memory, not inlined in the workspace.
+                'refs'     => [
+                    ['kind' => 'memory', 'ref' => '019ee18b-071e-7071-986a-7afc2485be2f', 'note' => 'assessment-app-mailjet', 'when' => 'crear o mantener app de IT Assessment con PDF por Mailjet (Josué)', 'load' => 'lazy'],
+                ],
             ],
 
             // ── CHANNEL: OpenClaw / WhatsApp group ───────────────────────────
