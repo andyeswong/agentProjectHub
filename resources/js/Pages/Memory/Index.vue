@@ -95,7 +95,7 @@ function fmt(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { mon
       </header>
 
       <!-- ── Workspace tabs ── -->
-      <div v-if="workspaces?.length > 1" class="flex flex-wrap gap-px" style="background-color: var(--color-surface-border);">
+      <div v-if="workspaces?.length > 1" class="inline-flex flex-wrap gap-px max-w-full self-start" style="background-color: var(--color-surface-border); border: 1px solid var(--color-surface-border);">
         <button @click="setWorkspace('')"
           class="flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-medium transition-colors"
           :style="!activeWorkspaceId

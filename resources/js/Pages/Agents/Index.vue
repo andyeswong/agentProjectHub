@@ -6,14 +6,6 @@ import { ref } from 'vue'
 defineProps({ agents: Array })
 
 const inviteOpen = ref(false)
-
-const providerColor = {
-    anthropic: '#c084fc',
-    openai:    '#10b981',
-    ollama:    '#f59e0b',
-    gemini:    '#4285f4',
-    custom:    'var(--color-neutral)',
-}
 </script>
 
 <template>
@@ -64,13 +56,13 @@ const providerColor = {
                                 <p v-if="agent.system_prompt_hash" class="text-xs mt-0.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ agent.system_prompt_hash }}</p>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-xs px-2 py-0.5 rounded-full"
-                                    :style="{ backgroundColor: (providerColor[agent.model_provider] ?? 'var(--color-neutral)') + '20', color: providerColor[agent.model_provider] ?? 'var(--color-neutral)' }">
+                                <span class="text-[0.65rem] uppercase tracking-wider px-1.5 py-0.5"
+                                    style="font-family: var(--font-mono); color: var(--color-text-secondary); border: 1px solid var(--color-surface-border);">
                                     {{ agent.model_provider ?? '—' }}
                                 </span>
-                                <span v-if="agent.is_revoked" class="text-xs px-2 py-0.5 rounded-full" style="background-color: rgba(239,68,68,0.1); color: var(--color-danger);">revoked</span>
-                                <div v-else class="flex items-center gap-1">
-                                    <span class="w-1.5 h-1.5 rounded-full" style="background-color: var(--color-success);"></span>
+                                <span v-if="agent.is_revoked" class="text-[0.65rem] uppercase tracking-wider px-1.5 py-0.5" style="color: var(--color-danger); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);">revoked</span>
+                                <div v-else class="flex items-center gap-1.5">
+                                    <span class="inline-block" style="width: 7px; height: 7px; background-color: var(--color-success);"></span>
                                     <span class="text-xs" style="color: var(--color-success);">active</span>
                                 </div>
                             </div>
