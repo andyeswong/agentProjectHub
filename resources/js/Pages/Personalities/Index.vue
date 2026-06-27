@@ -3,10 +3,42 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiHeading from '@/Components/atoms/UiHeading.vue'
 import UiButton from '@/Components/atoms/UiButton.vue'
+import UiIcon from '@/Components/atoms/UiIcon.vue'
 import { router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 
 defineProps({ selves: { type: Array, default: () => [] } })
+const PLUS = 'M12 4v16m8-8H4'
+
+// ── New self ────────────────────────────────────────────────────────────────
+const addingSelf = ref(false)
+const selfForm = ref({ slug: '', name: '', register: '', soul: '' })
+const creatingSelf = ref(false)
+function createSelf() {
+  if (!selfForm.value.slug.trim() || !selfForm.value.name.trim() || creatingSelf.value) return
+  creatingSelf.value = true
+  router.post('/personalities', selfForm.value, {
+    preserveScroll: true,
+    onSuccess: () => { selfForm.value = { slug: '', name: '', register: '', soul: '' }; addingSelf.value = false },
+    onFinish: () => creatingSelf.value = false,
+  })
+}
+
+// ── Add layer ─────────────────────────────────────────────────────────────────
+const addingLayer = ref(null)
+const layerForm = ref({ level: 'runtime', match_client_type: '', match_channel: '', register: '', soul: '' })
+const addingLayerBusy = ref(false)
+function openLayer(slug) {
+  addingLayer.value = slug
+  layerForm.value = { level: 'runtime', match_client_type: '', match_channel: '', register: '', soul: '' }
+}
+function addLayer(slug) {
+  if (!layerForm.value.match_client_type.trim() || addingLayerBusy.value) return
+  addingLayerBusy.value = true
+  router.post(`/personalities/${slug}/layers`, layerForm.value, {
+    preserveScroll: true, onSuccess: () => addingLayer.value = null, onFinish: () => addingLayerBusy.value = false,
+  })
+}
 
 const levelColor = { core: 'var(--color-accent)', runtime: 'var(--color-warning)', channel: 'var(--color-success)' }
 const indent = { core: '', runtime: 'ml-4 md:ml-6', channel: 'ml-8 md:ml-12' }
@@ -37,19 +69,50 @@ function save(l) {
 <template>
   <AppLayout>
     <div class="space-y-8">
-      <header>
-        <UiLabel>Identity</UiLabel>
-        <UiHeading :level="1" class="mt-1">Personalities</UiHeading>
-        <p class="text-xs mt-2" style="color: var(--color-text-muted); font-family: var(--font-mono);">The self a stateless body wears — core → runtime → channel, resolved per body.</p>
+      <header class="flex items-end justify-between gap-4">
+        <div>
+          <UiLabel>Identity</UiLabel>
+          <UiHeading :level="1" class="mt-1">Personalities</UiHeading>
+          <p class="text-xs mt-2" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ selves.length }} {{ selves.length === 1 ? 'self' : 'selves' }} · core → runtime → channel, resolved per body.</p>
+        </div>
+        <UiButton variant="outline" size="sm" @click="addingSelf = !addingSelf"><UiIcon :path="PLUS" :size="14" /> New self</UiButton>
       </header>
 
-      <div v-if="!selves.length" class="p-10 text-center text-sm" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); color: var(--color-text-muted);">No personalities yet.</div>
+      <!-- New-self composer -->
+      <div v-if="addingSelf" class="p-4 space-y-3" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); box-shadow: inset 2px 0 0 var(--color-accent);">
+        <div class="flex flex-col md:flex-row gap-2">
+          <input v-model="selfForm.slug" placeholder="slug (a-z, e.g. devbot)" class="md:w-48 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);" />
+          <input v-model="selfForm.name" placeholder="Display name" class="md:w-56 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border);" />
+          <input v-model="selfForm.register" placeholder="register (tone)" class="flex-1 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border);" />
+        </div>
+        <textarea v-model="selfForm.soul" rows="3" placeholder="Soul — who this self is…" class="w-full px-3 py-2 text-sm outline-none resize-y" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border);"></textarea>
+        <div class="flex justify-end"><UiButton variant="solid" size="sm" :disabled="creatingSelf || !selfForm.slug.trim() || !selfForm.name.trim()" @click="createSelf">{{ creatingSelf ? 'Creating…' : 'Create self' }}</UiButton></div>
+      </div>
+
+      <div v-if="!selves.length && !addingSelf" class="p-10 text-center text-sm" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); color: var(--color-text-muted);">No personalities yet — create the first self.</div>
 
       <!-- Each self -->
       <section v-for="self in selves" :key="self.slug" class="space-y-2">
-        <div class="flex items-baseline gap-3">
-          <h2 class="font-display text-2xl" style="color: var(--color-text-primary); letter-spacing: -0.015em;">{{ self.name }}</h2>
-          <span class="text-xs" style="font-family: var(--font-mono); color: var(--color-text-muted);">{{ self.slug }} · {{ self.layers.length }} layers</span>
+        <div class="flex items-baseline justify-between gap-3">
+          <div class="flex items-baseline gap-3">
+            <h2 class="font-display text-2xl" style="color: var(--color-text-primary); letter-spacing: -0.015em;">{{ self.name }}</h2>
+            <span class="text-xs" style="font-family: var(--font-mono); color: var(--color-text-muted);">{{ self.slug }} · {{ self.layers.length }} layers</span>
+          </div>
+          <button @click="addingLayer === self.slug ? addingLayer = null : openLayer(self.slug)" class="text-[0.65rem] uppercase tracking-wider link-underline" style="color: var(--color-text-muted);">{{ addingLayer === self.slug ? 'close' : '+ layer' }}</button>
+        </div>
+
+        <!-- Add-layer composer -->
+        <div v-if="addingLayer === self.slug" class="p-4 space-y-3" style="background-color: var(--color-surface-sunken); border: 1px solid var(--color-surface-border); box-shadow: inset 2px 0 0 var(--color-accent);">
+          <div class="flex flex-wrap gap-2">
+            <select v-model="layerForm.level" class="px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);">
+              <option value="runtime">runtime</option><option value="channel">channel</option>
+            </select>
+            <input v-model="layerForm.match_client_type" placeholder="client_type (e.g. openclaw)" class="px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);" />
+            <input v-if="layerForm.level === 'channel'" v-model="layerForm.match_channel" placeholder="channel (e.g. whatsapp-dm)" class="px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);" />
+            <input v-model="layerForm.register" placeholder="register (tone delta)" class="flex-1 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border);" />
+          </div>
+          <textarea v-model="layerForm.soul" rows="2" placeholder="Soul addendum (the delta for this body/channel)…" class="w-full px-3 py-2 text-sm outline-none resize-y" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border);"></textarea>
+          <div class="flex justify-end"><UiButton variant="solid" size="sm" :disabled="addingLayerBusy || !layerForm.match_client_type.trim()" @click="addLayer(self.slug)">{{ addingLayerBusy ? 'Adding…' : 'Add layer' }}</UiButton></div>
         </div>
 
         <!-- Cascade -->

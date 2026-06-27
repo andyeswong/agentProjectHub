@@ -48,6 +48,8 @@ Route::middleware('pilot.auth')->group(function () {
     Route::patch('/tasks/{id}', [TaskWebController::class, 'update'])->name('tasks.update');
     Route::post('/tasks/{id}/comments', [TaskWebController::class, 'comment'])->name('tasks.comment');
     Route::get('/personalities', [PersonalityWebController::class, 'index'])->name('personalities.index');
+    Route::post('/personalities', [PersonalityWebController::class, 'store'])->name('personalities.store');
+    Route::post('/personalities/{slug}/layers', [PersonalityWebController::class, 'addLayer'])->name('personalities.layers.add');
     Route::patch('/personality-layer/{id}', [PersonalityWebController::class, 'updateLayer'])->name('personalities.layer.update');
     Route::get('/agents', [AgentWebController::class, 'index'])->name('agents.index');
     Route::patch('/agents/{id}', [AgentWebController::class, 'update'])->name('agents.update');
