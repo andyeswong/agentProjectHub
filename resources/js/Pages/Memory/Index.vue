@@ -42,6 +42,43 @@ function clearSearch() {
   router.get('/memory', {}, { preserveState: false, replace: true })
 }
 
+// ── Workspace management ─────────────────────────────────────────────────────
+const manageOpen = ref(false)
+const newWsName = ref('')
+const wsBusy = ref(false)
+const renaming = ref(null)
+const renameName = ref('')
+const deleting = ref(null)       // workspace id pending delete confirmation
+const moveTarget = ref('')
+const wsError = ref('')
+
+function createWs() {
+  if (!newWsName.value.trim() || wsBusy.value) return
+  wsBusy.value = true; wsError.value = ''
+  router.post('/workspaces', { name: newWsName.value.trim() }, {
+    preserveScroll: true, onSuccess: () => { newWsName.value = '' }, onFinish: () => wsBusy.value = false,
+  })
+}
+function startRename(ws) { renaming.value = ws.id; renameName.value = ws.name; deleting.value = null }
+function renameWs(ws) {
+  if (!renameName.value.trim() || wsBusy.value) return
+  wsBusy.value = true
+  router.patch(`/workspaces/${ws.id}`, { name: renameName.value.trim() }, {
+    preserveScroll: true, onSuccess: () => { renaming.value = null }, onFinish: () => wsBusy.value = false,
+  })
+}
+function startDelete(ws) { deleting.value = ws.id; moveTarget.value = ''; wsError.value = ''; renaming.value = null }
+function deleteWs(ws) {
+  wsBusy.value = true; wsError.value = ''
+  const payload = (ws.memory_count > 0 && moveTarget.value) ? { move_to: moveTarget.value } : {}
+  router.delete(`/workspaces/${ws.id}`, {
+    data: payload, preserveScroll: true,
+    onSuccess: () => { deleting.value = null },
+    onError: (e) => { wsError.value = e.move_to || 'Delete failed — move its contents first.' },
+    onFinish: () => wsBusy.value = false,
+  })
+}
+
 const revealModal = ref(null)
 const revealLoading = ref(false)
 async function revealValue(memory) {
@@ -92,8 +129,70 @@ function fmt(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { mon
             {{ activeWorkspace ? activeWorkspace.name : 'All workspaces' }} · {{ stats?.total ?? 0 }} memories · {{ stats?.embedded ?? 0 }} embedded
           </p>
         </div>
-        <UiBadge tone="neutral"><UiStatusDot tone="success" :size="6" /> {{ embed_model }}</UiBadge>
+        <div class="flex items-center gap-2">
+          <UiButton variant="outline" size="sm" @click="manageOpen = !manageOpen">{{ manageOpen ? 'Done' : 'Manage workspaces' }}</UiButton>
+          <UiBadge tone="neutral"><UiStatusDot tone="success" :size="6" /> {{ embed_model }}</UiBadge>
+        </div>
       </header>
+
+      <!-- ── Manage workspaces ── -->
+      <UiCard v-if="manageOpen" pad="p-4" class="space-y-3">
+        <div class="flex items-center gap-3"><UiLabel tone="accent">Workspaces</UiLabel><UiRule /></div>
+
+        <!-- Create -->
+        <div class="flex gap-2">
+          <input v-model="newWsName" @keydown.enter="createWs" type="text" placeholder="New workspace name…"
+            class="flex-1 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);" />
+          <UiButton variant="solid" size="sm" :disabled="wsBusy || !newWsName.trim()" @click="createWs">Create</UiButton>
+        </div>
+
+        <!-- List -->
+        <div style="border: 1px solid var(--color-surface-border);">
+          <div v-for="(ws, i) in workspaces" :key="ws.id" class="px-3 py-2.5"
+            :style="i > 0 ? 'border-top: 1px solid var(--color-surface-border);' : ''">
+            <div class="flex items-center justify-between gap-3">
+              <template v-if="renaming === ws.id">
+                <input v-model="renameName" @keydown.enter="renameWs(ws)" class="flex-1 px-2 py-1 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-accent); font-family: var(--font-mono);" />
+                <UiButton variant="solid" size="sm" :disabled="wsBusy" @click="renameWs(ws)">Save</UiButton>
+                <button @click="renaming = null" class="text-[0.65rem] uppercase tracking-wider" style="color: var(--color-text-muted);">cancel</button>
+              </template>
+              <template v-else>
+                <span class="flex items-center gap-2 min-w-0">
+                  <span class="text-sm truncate" style="color: var(--color-text-primary); font-family: var(--font-mono);">{{ ws.name }}</span>
+                  <span class="text-[0.6rem] tabular-nums" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ ws.memory_count ?? 0 }} mem</span>
+                </span>
+                <span class="flex items-center gap-3 shrink-0">
+                  <button @click="startRename(ws)" class="text-[0.65rem] uppercase tracking-wider link-underline" style="color: var(--color-text-muted);">rename</button>
+                  <button @click="startDelete(ws)" class="text-[0.65rem] uppercase tracking-wider link-underline" style="color: var(--color-danger);">delete</button>
+                </span>
+              </template>
+            </div>
+
+            <!-- Delete confirmation -->
+            <div v-if="deleting === ws.id" class="mt-2 pt-2 px-3 py-2.5" style="border-top: 1px solid var(--color-surface-border); background-color: var(--color-surface-sunken); box-shadow: inset 2px 0 0 var(--color-danger);">
+              <template v-if="(ws.memory_count ?? 0) === 0">
+                <p class="text-xs mb-2" style="color: var(--color-text-secondary);">Workspace is empty. Delete it permanently?</p>
+                <div class="flex items-center gap-2">
+                  <UiButton variant="danger" size="sm" :disabled="wsBusy" @click="deleteWs(ws)">Delete</UiButton>
+                  <button @click="deleting = null" class="text-[0.65rem] uppercase tracking-wider" style="color: var(--color-text-muted);">cancel</button>
+                </div>
+              </template>
+              <template v-else>
+                <p class="text-xs mb-2" style="color: var(--color-text-secondary);">Has <span style="color: var(--color-danger);">{{ ws.memory_count }} memories</span>. Move them to another workspace, then delete:</p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <select v-model="moveTarget" class="px-2.5 py-1.5 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);">
+                    <option value="">Move all to…</option>
+                    <option v-for="t in workspaces.filter(w => w.id !== ws.id)" :key="t.id" :value="t.id">{{ t.name }}</option>
+                  </select>
+                  <UiButton variant="danger" size="sm" :disabled="wsBusy || !moveTarget" @click="deleteWs(ws)">Move all &amp; delete</UiButton>
+                  <button @click="deleting = null" class="text-[0.65rem] uppercase tracking-wider" style="color: var(--color-text-muted);">cancel</button>
+                </div>
+              </template>
+              <p v-if="wsError" class="text-[0.65rem] mt-1.5" style="color: var(--color-danger); font-family: var(--font-mono);">{{ wsError }}</p>
+            </div>
+          </div>
+        </div>
+      </UiCard>
 
       <!-- ── Workspace tabs ── -->
       <div v-if="workspaces?.length > 1" class="inline-flex flex-wrap gap-px max-w-full self-start" style="background-color: var(--color-surface-border); border: 1px solid var(--color-surface-border);">

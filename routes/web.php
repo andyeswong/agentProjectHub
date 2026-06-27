@@ -8,7 +8,9 @@ use App\Http\Controllers\Web\ChannelWebController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\MemoryWebController;
 use App\Http\Controllers\Web\PilotSessionController;
+use App\Http\Controllers\Web\PilotWebController;
 use App\Http\Controllers\Web\ProjectWebController;
+use App\Http\Controllers\Web\WorkspaceWebController;
 use App\Http\Controllers\Web\PublicDashboardController;
 use App\Http\Controllers\Web\TaskWebController;
 use Illuminate\Support\Facades\Route;
@@ -62,4 +64,13 @@ Route::middleware('pilot.auth')->group(function () {
     Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');
     Route::get('/memory/{id}', [MemoryWebController::class, 'show'])->name('memory.show');
     Route::post('/memory/{id}/integrate', [MemoryWebController::class, 'integrate'])->name('memory.integrate');
+    Route::patch('/memory/{id}/move', [MemoryWebController::class, 'move'])->name('memory.move');
+
+    // Workspace management (create / rename / delete with move-or-empty policy)
+    Route::post('/workspaces', [WorkspaceWebController::class, 'store'])->name('workspaces.store');
+    Route::patch('/workspaces/{id}', [WorkspaceWebController::class, 'update'])->name('workspaces.update');
+    Route::delete('/workspaces/{id}', [WorkspaceWebController::class, 'destroy'])->name('workspaces.destroy');
+
+    // Pilots — team usage tracking
+    Route::get('/pilots', [PilotWebController::class, 'index'])->name('pilots.index');
 });

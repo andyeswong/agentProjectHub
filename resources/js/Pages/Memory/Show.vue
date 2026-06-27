@@ -8,7 +8,7 @@ import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 
-const props = defineProps({ memory: Object, related: Array })
+const props = defineProps({ memory: Object, related: Array, workspaces: { type: Array, default: () => [] } })
 
 const typeColor = {
   credential: 'var(--color-danger)', domain: 'var(--color-accent)', ip: 'var(--color-warning)',
@@ -24,6 +24,22 @@ async function reveal() {
   const r = await fetch(`/memory/${props.memory.id}/reveal`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
   if (r.ok) revealed.value = await r.json()
 }
+
+// move between workspaces
+const moveTo = ref(props.memory.workspace_id || '')
+const moving = ref(false)
+const moveError = ref('')
+function move() {
+  if (!moveTo.value || moveTo.value === props.memory.workspace_id || moving.value) return
+  moving.value = true
+  moveError.value = ''
+  router.patch(`/memory/${props.memory.id}/move`, { workspace_id: moveTo.value }, {
+    preserveScroll: true,
+    onError: (e) => { moveError.value = e.workspace_id || 'Move failed'; moveTo.value = props.memory.workspace_id },
+    onFinish: () => moving.value = false,
+  })
+}
+const selectStyle = 'background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);'
 
 // integrate (complement)
 const note = ref('')
@@ -78,7 +94,24 @@ function integrate() {
         </div>
 
         <p v-if="memory.origin" class="text-xs mt-3" style="color: var(--color-text-muted);">origin: {{ memory.origin }}</p>
-        <p class="text-xs mt-2 flex items-center gap-1.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">by <UiAgentTag :handle="memory.creator?.model" :pilot="memory.creator?.pilot" size="xs" /> · {{ fmt(memory.created_at) }}</p>
+
+        <!-- Provenance + signals -->
+        <div class="mt-4 pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs" style="border-top: 1px solid var(--color-surface-border); color: var(--color-text-muted); font-family: var(--font-mono);">
+          <span class="flex items-center gap-1.5">created by <UiAgentTag :handle="memory.creator?.model" :pilot="memory.creator?.pilot" size="xs" /> · {{ fmt(memory.created_at) }}</span>
+          <span v-if="memory.last_updated_by && memory.updated_at !== memory.created_at" class="flex items-center gap-1.5">edited by <UiAgentTag :handle="memory.lastEditor?.model" :pilot="memory.lastEditor?.pilot" size="xs" /> · {{ fmt(memory.updated_at) }}</span>
+          <span :title="memory.last_queried_at ? 'last queried ' + fmt(memory.last_queried_at) : 'never queried'"><span style="color: var(--color-accent);">{{ memory.query_hits || 0 }}</span> consultas</span>
+          <span v-if="memory.is_embedded" style="color: var(--color-success);">embedded</span>
+        </div>
+
+        <!-- Workspace + move -->
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <span class="text-[0.6rem] uppercase tracking-wider" style="color: var(--color-text-muted); font-family: var(--font-mono);">workspace</span>
+          <select v-model="moveTo" @change="move" :disabled="moving" class="px-2.5 py-1 text-xs outline-none" :style="selectStyle">
+            <option v-for="w in workspaces" :key="w.id" :value="w.id">{{ w.name }}</option>
+          </select>
+          <span v-if="moving" class="text-[0.65rem]" style="color: var(--color-text-muted);">moving…</span>
+          <span v-if="moveError" class="text-[0.65rem]" style="color: var(--color-danger); font-family: var(--font-mono);">{{ moveError }}</span>
+        </div>
       </UiCard>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

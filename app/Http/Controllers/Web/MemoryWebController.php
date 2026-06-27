@@ -131,10 +131,51 @@ class MemoryWebController extends Controller
             ];
         })->filter()->sortByDesc('weight')->values();
 
+        $workspaces = Workspace::where('org_id', $apiKey->org_id)->orderBy('name')
+            ->get(['id', 'name', 'slug']);
+
         return Inertia::render('Memory/Show', [
-            'memory'  => $memory->toPublicArray(),
-            'related' => $related,
+            'memory'     => $memory->toPublicArray(),
+            'related'    => $related,
+            'workspaces' => $workspaces,
         ]);
+    }
+
+    // PATCH /memory/{id}/move — relocate a memory to another workspace in the org.
+    public function move(Request $request, string $id)
+    {
+        $apiKey = $request->attributes->get('pilot_api_key');
+        $allIds = Workspace::where('org_id', $apiKey->org_id)->pluck('id')->all();
+        $memory = AgentMemory::whereIn('workspace_id', $allIds)->findOrFail($id);
+
+        $data = $request->validate([
+            'workspace_id' => 'required|uuid',
+        ]);
+
+        if (!in_array($data['workspace_id'], $allIds, true)) {
+            return \Illuminate\Support\Facades\Redirect::back()->withErrors(['workspace_id' => 'Unknown workspace.']);
+        }
+        if ($data['workspace_id'] === $memory->workspace_id) {
+            return \Illuminate\Support\Facades\Redirect::back();
+        }
+
+        // memory_key is unique per workspace — refuse if the target already has it.
+        if ($memory->memory_key) {
+            $clash = AgentMemory::where('workspace_id', $data['workspace_id'])
+                ->where('memory_key', $memory->memory_key)->exists();
+            if ($clash) {
+                return \Illuminate\Support\Facades\Redirect::back()->withErrors([
+                    'workspace_id' => "Target workspace already has a memory with key '{$memory->memory_key}'.",
+                ]);
+            }
+        }
+
+        $memory->update([
+            'workspace_id'    => $data['workspace_id'],
+            'last_updated_by' => $apiKey->id,
+        ]);
+
+        return \Illuminate\Support\Facades\Redirect::route('memory.show', $memory->id);
     }
 
     // POST /memory/{id}/integrate — pilot complements a memory (append note, no overwrite).
