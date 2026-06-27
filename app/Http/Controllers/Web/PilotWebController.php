@@ -24,22 +24,28 @@ class PilotWebController extends Controller
 
         $online = now()->subSeconds(90);
 
-        // id -> pilot map from ALL org keys (not only agents): memories/sessions
-        // can be authored by any key, and we attribute them to the human.
-        $allKeys = ApiKey::where('org_id', $orgId)->get(['id', 'pilot']);
-        $pilotOf = [];
+        // key id -> stable pilot IDENTITY (pilot_id when set; else a normalized
+        // name) so free-text casing/spacing variants don't fragment one human.
+        // We also remember a human DISPLAY name per identity.
+        $allKeys = ApiKey::where('org_id', $orgId)->get(['id', 'pilot', 'pilot_id']);
+        $identityOf = [];
+        $displayOf  = [];
         foreach ($allKeys as $k) {
-            $pilotOf[$k->id] = $this->norm($k->pilot);
+            [$id, $name] = $this->identity($k->pilot_id, $k->pilot);
+            $identityOf[$k->id] = $id;
+            // Prefer the first non-unassigned, non-empty display we encounter.
+            if (!isset($displayOf[$id]) || ($displayOf[$id] === self::UNASSIGNED && $name !== self::UNASSIGNED)) {
+                $displayOf[$id] = $name;
+            }
         }
         $orgKeyIds = $allKeys->pluck('id');
 
-        // Bucket factory — pilots are discovered from agents first, then anything
-        // else (memories/sessions) authored by a key mapped to that pilot.
+        // Bucket factory keyed by identity; the human display name lives in 'pilot'.
         $pilots = [];
-        $bucket = function (string $name) use (&$pilots): int {
-            if (!isset($pilots[$name])) {
-                $pilots[$name] = [
-                    'pilot'              => $name,
+        $bucket = function (string $identity) use (&$pilots, &$displayOf): int {
+            if (!isset($pilots[$identity])) {
+                $pilots[$identity] = [
+                    'pilot'              => $displayOf[$identity] ?? self::UNASSIGNED,
                     'pilot_contact'      => null,
                     'agents_count'       => 0,
                     'online_count'       => 0,
@@ -66,9 +72,9 @@ class PilotWebController extends Controller
             ->get();
 
         foreach ($agents as $a) {
-            $name = $this->norm($a->pilot);
-            $bucket($name);
-            $p = &$pilots[$name];
+            [$id] = $this->identity($a->pilot_id, $a->pilot);
+            $bucket($id);
+            $p = &$pilots[$id];
 
             $p['agents_count']++;
             if (count($p['handles']) < 6) {
@@ -98,9 +104,9 @@ class PilotWebController extends Controller
             ->get(['created_by', 'type', 'query_hits', 'reinforced_count']);
 
         foreach ($memories as $m) {
-            $name = $pilotOf[$m->created_by] ?? self::UNASSIGNED;
-            $bucket($name);
-            $p = &$pilots[$name];
+            $id = $identityOf[$m->created_by] ?? self::UNASSIGNED;
+            $bucket($id);
+            $p = &$pilots[$id];
 
             $p['memories_created']++;
             $type = $m->type ?: 'other';
@@ -117,9 +123,9 @@ class PilotWebController extends Controller
             ->get(['api_key_id', 'status', 'open_threads']);
 
         foreach ($sessions as $s) {
-            $name = $pilotOf[$s->api_key_id] ?? self::UNASSIGNED;
-            $bucket($name);
-            $p = &$pilots[$name];
+            $id = $identityOf[$s->api_key_id] ?? self::UNASSIGNED;
+            $bucket($id);
+            $p = &$pilots[$id];
 
             $p['sessions_count']++;
             if (in_array($s->status, ['active', 'paused'], true)) {
@@ -160,8 +166,23 @@ class PilotWebController extends Controller
         ]);
     }
 
-    private function norm(?string $pilot): string
+    /**
+     * Stable identity + human display for a pilot.
+     * Identity = pilot_id when set (survives free-text variants), else a
+     * normalized name key, else UNASSIGNED. Display = the human-facing name.
+     *
+     * @return array{0:string,1:string} [identity, display]
+     */
+    private function identity(?string $pilotId, ?string $pilot): array
     {
-        return ($pilot === null || trim($pilot) === '') ? self::UNASSIGNED : $pilot;
+        $name = ($pilot === null || trim($pilot) === '') ? self::UNASSIGNED : trim($pilot);
+
+        if ($pilotId) {
+            return ['pid:' . $pilotId, $name];
+        }
+        if ($name === self::UNASSIGNED) {
+            return [self::UNASSIGNED, self::UNASSIGNED];
+        }
+        return ['name:' . mb_strtolower($name), $name];
     }
 }
