@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\Web\AgentWebController;
 use App\Http\Controllers\Web\PersonalityWebController;
+use App\Http\Controllers\Web\SessionWebController;
+use App\Http\Controllers\Web\EventWebController;
+use App\Http\Controllers\Web\ChannelWebController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\MemoryWebController;
 use App\Http\Controllers\Web\PilotSessionController;
@@ -50,6 +53,9 @@ Route::middleware('pilot.auth')->group(function () {
     Route::patch('/agents/{id}', [AgentWebController::class, 'update'])->name('agents.update');
     Route::post('/agents/{id}/revoke', [AgentWebController::class, 'revoke'])->name('agents.revoke');
     Route::post('/agents/{id}/restore', [AgentWebController::class, 'restore'])->name('agents.restore');
+    Route::get('/sessions', [SessionWebController::class, 'index'])->name('sessions.index');
+    Route::get('/events', [EventWebController::class, 'index'])->name('events.index');
+    Route::get('/channels', [ChannelWebController::class, 'index'])->name('channels.index');
     Route::get('/memory', [MemoryWebController::class, 'index'])->name('memory.index');
     Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');
     Route::get('/memory/{id}', [MemoryWebController::class, 'show'])->name('memory.show');
