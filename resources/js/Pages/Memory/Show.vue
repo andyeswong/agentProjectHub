@@ -4,6 +4,7 @@ import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiCard from '@/Components/atoms/UiCard.vue'
 import UiButton from '@/Components/atoms/UiButton.vue'
 import UiIcon from '@/Components/atoms/UiIcon.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 
@@ -77,7 +78,7 @@ function integrate() {
         </div>
 
         <p v-if="memory.origin" class="text-xs mt-3" style="color: var(--color-text-muted);">origin: {{ memory.origin }}</p>
-        <p class="text-xs mt-2" style="color: var(--color-text-muted); font-family: var(--font-mono);">by {{ memory.creator?.model ?? '—' }} · {{ fmt(memory.created_at) }}</p>
+        <p class="text-xs mt-2 flex items-center gap-1.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">by <UiAgentTag :handle="memory.creator?.model" :pilot="memory.creator?.pilot" size="xs" /> · {{ fmt(memory.created_at) }}</p>
       </UiCard>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

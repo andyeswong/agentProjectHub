@@ -3,6 +3,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiHeading from '@/Components/atoms/UiHeading.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 import { router } from '@inertiajs/vue3'
 defineProps({ events: { type: Array, default: () => [] }, kinds: { type: Array, default: () => [] }, filter: String })
 
@@ -40,7 +41,7 @@ const payloadStr = (p) => p ? Object.entries(p).map(([k, v]) => `${k}: ${typeof 
               <span class="text-xs font-medium" style="font-family: var(--font-mono); color: var(--color-text-primary);">{{ e.type }}</span>
               <span class="text-[0.65rem] shrink-0" style="color: var(--color-text-muted);">{{ e.time_ago }}</span>
             </div>
-            <p class="text-[0.65rem] mt-0.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ e.actor_model }}<span v-if="e.actor_pilot"> · {{ e.actor_pilot }}</span></p>
+            <p class="text-[0.65rem] mt-0.5" style="color: var(--color-text-muted); font-family: var(--font-mono);"><UiAgentTag :handle="e.actor_model" :pilot="e.actor_pilot" size="xs" inline /></p>
             <p v-if="payloadStr(e.payload)" class="text-[0.65rem] mt-0.5 truncate" style="color: var(--color-text-muted);">{{ payloadStr(e.payload) }}</p>
           </div>
         </div>

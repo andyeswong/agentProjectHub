@@ -463,6 +463,16 @@ class MemoryController extends Controller
         ])->values();
         $directCount = $results->count();
 
+        // "Most consulted" signal: bump query_hits for the direct semantic hits
+        // (not spread-activated ones — those weren't matched, just co-activated).
+        $hitIds = $result['results']->pluck('memory.id')->filter()->all();
+        if (!empty($hitIds)) {
+            AgentMemory::whereIn('id', $hitIds)->update([
+                'query_hits'      => \DB::raw('query_hits + 1'),
+                'last_queried_at' => now(),
+            ]);
+        }
+
         // Spreading activation: auto-fire memories strongly associated with the
         // direct hits (the "unconscious thoughts" that co-activate on recall).
         $spreadCount = 0;

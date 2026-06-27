@@ -15,7 +15,8 @@ class SessionWebController extends Controller
     public function index(Request $request): Response
     {
         $apiKey  = $request->attributes->get('pilot_api_key');
-        $keyIds  = ApiKey::where('org_id', $apiKey->org_id)->pluck('id');
+        $pilots  = ApiKey::where('org_id', $apiKey->org_id)->pluck('pilot', 'id');
+        $keyIds  = $pilots->keys();
 
         $sessions = AgentSession::whereIn('api_key_id', $keyIds)
             ->orderByDesc('last_active_at')
@@ -26,6 +27,7 @@ class SessionWebController extends Controller
                 'title'        => $s->title,
                 'summary'      => $s->summary,
                 'agent_handle' => $s->agent_handle,
+                'pilot'        => $pilots[$s->api_key_id] ?? null,
                 'open_threads' => $s->open_threads ?? [],
                 'status'       => $s->status,
                 'last_active'  => $s->last_active_at?->diffForHumans(),

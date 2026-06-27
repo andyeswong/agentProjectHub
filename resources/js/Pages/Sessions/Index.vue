@@ -3,6 +3,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiHeading from '@/Components/atoms/UiHeading.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 defineProps({ sessions: { type: Array, default: () => [] }, open_count: Number })
 const statusTone = (s) => s === 'done' ? 'neutral' : s === 'paused' ? 'warning' : 'success'
 </script>
@@ -24,7 +25,10 @@ const statusTone = (s) => s === 'done' ? 'neutral' : s === 'paused' ? 'warning' 
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="font-display text-lg leading-tight" style="color: var(--color-text-primary);">{{ s.title || 'session' }}</p>
-              <p class="text-xs mt-0.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ s.agent_handle }} · {{ s.last_active }}</p>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <UiAgentTag :handle="s.agent_handle" :pilot="s.pilot" size="xs" inline />
+                <span class="text-xs" style="color: var(--color-text-muted);">· {{ s.last_active }}</span>
+              </div>
             </div>
             <span class="flex items-center gap-1.5 shrink-0"><UiStatusDot :tone="statusTone(s.status)" :size="6" /><span class="text-[0.65rem] uppercase tracking-wider" style="font-family: var(--font-mono); color: var(--color-text-muted);">{{ s.status }}</span></span>
           </div>

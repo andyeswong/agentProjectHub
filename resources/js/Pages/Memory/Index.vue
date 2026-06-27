@@ -9,6 +9,7 @@ import UiIcon from '@/Components/atoms/UiIcon.vue'
 import UiInput from '@/Components/atoms/UiInput.vue'
 import UiRule from '@/Components/atoms/UiRule.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 import { router, Link } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 
@@ -218,7 +219,7 @@ function fmt(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { mon
               </div>
 
               <div class="flex flex-wrap items-center gap-3 text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">
-                <span v-if="memory.creator">by <span style="color: var(--color-text-secondary);">{{ memory.creator?.model ?? '—' }}</span></span>
+                <span v-if="memory.creator" class="flex items-center gap-1">by <UiAgentTag :handle="memory.creator?.model" :pilot="memory.creator?.pilot" size="xs" /></span>
                 <span>{{ fmt(memory.created_at) }}</span>
                 <span v-if="memory.expires_at" style="color: var(--color-warning);">expires {{ fmt(memory.expires_at) }}</span>
               </div>

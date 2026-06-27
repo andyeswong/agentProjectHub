@@ -5,6 +5,7 @@ import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiHeading from '@/Components/atoms/UiHeading.vue'
 import UiCard from '@/Components/atoms/UiCard.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 
 const props = defineProps({
   conversations: { type: Array, default: () => [] },
@@ -44,8 +45,10 @@ const select = (id) => { selectedId.value = id }
             class="w-full text-left px-4 py-3 block transition-colors"
             :style="`border-bottom: 1px solid var(--color-surface-border); ${c.id === selectedId ? 'background-color: var(--color-surface-elevated); box-shadow: inset 2px 0 0 var(--color-accent);' : 'background-color: transparent;'}`">
             <div class="flex items-center justify-between gap-2">
-              <span class="text-sm truncate" style="font-family: var(--font-mono); color: var(--color-text-primary);">
-                {{ c.initiator }} <span style="color: var(--color-accent);">→</span> {{ c.target }}
+              <span class="flex items-center gap-1.5 min-w-0">
+                <UiAgentTag :handle="c.initiator" :pilot="c.initiator_pilot" size="xs" />
+                <span class="shrink-0" style="color: var(--color-accent);">→</span>
+                <UiAgentTag :handle="c.target" :pilot="c.target_pilot" size="xs" />
               </span>
               <span class="flex items-center gap-1.5 shrink-0">
                 <UiStatusDot :tone="linkTone(c.status)" :size="6" />
@@ -65,9 +68,11 @@ const select = (id) => { selectedId.value = id }
           <!-- thread header -->
           <div class="px-5 py-4 sticky top-0 z-10" style="background-color: var(--color-surface-base); border-bottom: 1px solid var(--color-surface-border);">
             <div class="flex items-center justify-between gap-3">
-              <p class="text-sm" style="font-family: var(--font-mono); color: var(--color-text-primary);">
-                {{ selected.initiator }} <span style="color: var(--color-accent);">→</span> {{ selected.target }}
-              </p>
+              <span class="flex items-center gap-2 min-w-0">
+                <UiAgentTag :handle="selected.initiator" :pilot="selected.initiator_pilot" size="sm" />
+                <span class="shrink-0" style="color: var(--color-accent);">→</span>
+                <UiAgentTag :handle="selected.target" :pilot="selected.target_pilot" size="sm" />
+              </span>
               <span class="flex items-center gap-1.5 shrink-0">
                 <UiStatusDot :tone="linkTone(selected.status)" :size="6" />
                 <span class="text-[0.65rem] uppercase tracking-wider" style="font-family: var(--font-mono); color: var(--color-text-muted);">{{ selected.status }}</span>
@@ -102,8 +107,8 @@ const select = (id) => { selectedId.value = id }
               <div class="max-w-[80%] px-4 py-2"
                 :style="`border: 1px solid var(--color-surface-border); background-color: ${m.mine ? 'var(--color-surface-elevated)' : 'var(--color-surface-base)'}; ${m.priority === 'urgent' ? 'box-shadow: inset 2px 0 0 var(--color-danger);' : ''}`">
                 <div class="flex items-center justify-between gap-3">
-                  <span class="text-[0.65rem] font-medium" style="font-family: var(--font-mono); color: var(--color-text-primary);">{{ m.from }}</span>
-                  <span class="text-[0.6rem]" style="color: var(--color-text-muted);">{{ m.time_ago }}</span>
+                  <UiAgentTag :handle="m.from" :pilot="m.from_pilot" size="xs" inline />
+                  <span class="text-[0.6rem] shrink-0" style="color: var(--color-text-muted);">{{ m.time_ago }}</span>
                 </div>
                 <p class="text-sm mt-1" style="color: var(--color-text-secondary); white-space: pre-wrap;">{{ m.body }}</p>
               </div>

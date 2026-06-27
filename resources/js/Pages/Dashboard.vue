@@ -9,10 +9,16 @@ import UiRule from '@/Components/atoms/UiRule.vue'
 import UiIcon from '@/Components/atoms/UiIcon.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
 import StatCard from '@/Components/molecules/StatCard.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 import { ref, computed } from 'vue'
 import { usePage, Link } from '@inertiajs/vue3'
 
-const props = defineProps({ stats: Object, recentProjects: Array, recentEvents: Array })
+const props = defineProps({
+  stats: Object, recentProjects: Array, recentEvents: Array,
+  fleet: { type: Object, default: () => ({ agents: [], total: 0, available: 0 }) },
+  memory: { type: Object, default: () => ({ total: 0, last_7d: 0, by_type: [], top_consulted: [], top_reinforced: [] }) },
+  coordination: { type: Object, default: () => ({ open_links: 0, pending_links: 0, recent_messages: [], open_sessions: [] }) },
+})
 const page = usePage()
 const auth = computed(() => page.props.auth)
 const inviteOpen = ref(false)
@@ -85,6 +91,96 @@ const shortModel = (m) => m ? m.split('-').slice(0, 3).join('-') : '—'
           <StatCard index="04" label="Blocked"    :value="stats.blocked_tasks" :tone="stats.blocked_tasks > 0 ? 'danger' : 'primary'" :note="`${stats.agents} agent${stats.agents !== 1 ? 's' : ''} active`" :icon="ICON.blocked" />
         </div>
       </section>
+
+      <!-- ── Org pulse: Fleet · Memory · Coordination ── -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- FLEET -->
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3 flex-1"><UiLabel tone="accent">Fleet</UiLabel><UiRule /></div>
+            <span class="text-[0.65rem] shrink-0 ml-3" style="font-family: var(--font-mono); color: var(--color-text-muted);">{{ fleet.available }}/{{ fleet.total }} avail</span>
+          </div>
+          <UiCard pad="p-0">
+            <div v-if="!fleet.agents.length" class="px-4 py-8 text-center text-sm" style="color: var(--color-text-muted);">No agents.</div>
+            <ul v-else>
+              <li v-for="(a, i) in fleet.agents" :key="a.handle + i" class="flex items-center justify-between gap-3 px-4 py-2.5"
+                :style="i > 0 ? 'border-top: 1px solid var(--color-surface-border);' : ''">
+                <span class="flex items-center gap-2 min-w-0">
+                  <UiStatusDot :tone="a.online ? 'success' : a.available ? 'warning' : 'neutral'" :size="6" />
+                  <UiAgentTag :handle="a.handle" :pilot="a.pilot" size="xs" />
+                </span>
+                <span class="text-[0.6rem] shrink-0" style="color: var(--color-text-muted);">{{ a.last_active || '—' }}</span>
+              </li>
+            </ul>
+          </UiCard>
+        </section>
+
+        <!-- MEMORY -->
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3 flex-1"><UiLabel tone="accent">Memory</UiLabel><UiRule /></div>
+            <Link href="/memory" class="text-[0.65rem] uppercase tracking-wider link-underline shrink-0 ml-3" style="color: var(--color-text-muted);">Browse</Link>
+          </div>
+          <UiCard pad="p-4">
+            <div class="flex items-baseline gap-3">
+              <span class="font-display text-3xl tabular-nums" style="color: var(--color-text-primary);">{{ memory.total }}</span>
+              <span class="text-xs" style="color: var(--color-text-muted);">memories</span>
+              <span v-if="memory.last_7d" class="text-[0.65rem] ml-auto" style="font-family: var(--font-mono); color: var(--color-success);">+{{ memory.last_7d }} / 7d</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 mt-3">
+              <span v-for="t in memory.by_type" :key="t.type" class="text-[0.6rem] px-1.5 py-0.5"
+                style="font-family: var(--font-mono); color: var(--color-text-muted); border: 1px solid var(--color-surface-border);">{{ t.type }} {{ t.n }}</span>
+            </div>
+            <div class="mt-4">
+              <p class="text-[0.6rem] uppercase tracking-wider mb-1.5" style="font-family: var(--font-mono); color: var(--color-accent);">Most consulted</p>
+              <ul v-if="memory.top_consulted.length" class="space-y-1">
+                <li v-for="m in memory.top_consulted" :key="m.id" class="flex items-center justify-between gap-2">
+                  <span class="text-[0.7rem] truncate" style="color: var(--color-text-secondary);">{{ m.key || m.label }}</span>
+                  <span class="text-[0.6rem] shrink-0 tabular-nums" style="font-family: var(--font-mono); color: var(--color-text-muted);">{{ m.query_hits }} hits</span>
+                </li>
+              </ul>
+              <p v-else class="text-[0.65rem]" style="color: var(--color-text-muted);">Sin datos aún — se llena al consultar la memoria.</p>
+            </div>
+          </UiCard>
+        </section>
+
+        <!-- COORDINATION -->
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3 flex-1"><UiLabel tone="accent">Coordination</UiLabel><UiRule /></div>
+            <Link href="/channels" class="text-[0.65rem] uppercase tracking-wider link-underline shrink-0 ml-3" style="color: var(--color-text-muted);">Channels</Link>
+          </div>
+          <UiCard pad="p-4">
+            <div class="flex items-center gap-4">
+              <span class="flex items-baseline gap-1.5"><span class="font-display text-2xl tabular-nums" style="color: var(--color-success);">{{ coordination.open_links }}</span><span class="text-[0.65rem]" style="color: var(--color-text-muted);">open</span></span>
+              <span class="flex items-baseline gap-1.5"><span class="font-display text-2xl tabular-nums" :style="`color: ${coordination.pending_links ? 'var(--color-warning)' : 'var(--color-text-muted)'};`">{{ coordination.pending_links }}</span><span class="text-[0.65rem]" style="color: var(--color-text-muted);">pending</span></span>
+            </div>
+            <div v-if="coordination.recent_messages.length" class="mt-4">
+              <p class="text-[0.6rem] uppercase tracking-wider mb-1.5" style="font-family: var(--font-mono); color: var(--color-accent);">Recent messages</p>
+              <ul class="space-y-1.5">
+                <li v-for="(m, i) in coordination.recent_messages" :key="i" class="min-w-0">
+                  <div class="flex items-center justify-between gap-2">
+                    <UiAgentTag :handle="m.from" :pilot="m.pilot" size="xs" inline />
+                    <span class="text-[0.6rem] shrink-0" style="color: var(--color-text-muted);">{{ m.time_ago }}</span>
+                  </div>
+                  <p class="text-[0.65rem] truncate" :style="`color: ${m.priority === 'urgent' ? 'var(--color-danger)' : 'var(--color-text-muted)'};`">{{ m.preview }}</p>
+                </li>
+              </ul>
+            </div>
+            <div v-if="coordination.open_sessions.length" class="mt-4">
+              <p class="text-[0.6rem] uppercase tracking-wider mb-1.5" style="font-family: var(--font-mono); color: var(--color-accent);">Open sessions</p>
+              <ul class="space-y-1">
+                <li v-for="(s, i) in coordination.open_sessions" :key="i" class="flex items-center justify-between gap-2">
+                  <span class="text-[0.7rem] truncate" style="color: var(--color-text-secondary);">{{ s.title || s.handle }}</span>
+                  <span class="text-[0.6rem] shrink-0" style="font-family: var(--font-mono); color: var(--color-warning);">{{ s.threads }} thr</span>
+                </li>
+              </ul>
+            </div>
+            <p v-if="!coordination.recent_messages.length && !coordination.open_sessions.length" class="text-[0.65rem] mt-3" style="color: var(--color-text-muted);">Sin coordinación activa.</p>
+          </UiCard>
+        </section>
+      </div>
 
       <!-- ── Projects (7) + Activity (5) ── -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">

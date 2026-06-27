@@ -4,6 +4,7 @@ import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiCard from '@/Components/atoms/UiCard.vue'
 import UiButton from '@/Components/atoms/UiButton.vue'
 import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 
@@ -132,7 +133,7 @@ function postComment() {
                 :style="`box-shadow: inset 2px 0 0 ${commentTypeColor[comment.type]}; ${i > 0 ? 'border-top: 1px solid var(--color-surface-border);' : ''}`">
                 <div class="flex items-center justify-between gap-2 mb-1.5">
                   <div class="flex items-center gap-2">
-                    <span class="text-xs font-medium" style="color: var(--color-text-primary);">{{ comment.actor?.pilot ?? comment.actor?.model }}</span>
+                    <UiAgentTag :handle="comment.actor?.model" :pilot="comment.actor?.pilot" size="xs" />
                     <span class="text-[0.6rem] uppercase tracking-wider px-1 py-0.5" :style="`color: ${commentTypeColor[comment.type]}; border: 1px solid var(--color-surface-border); font-family: var(--font-mono);`">{{ comment.type }}</span>
                   </div>
                   <span class="text-[0.65rem]" style="color: var(--color-text-muted);">{{ comment.created_at }}</span>
@@ -156,7 +157,7 @@ function postComment() {
                 </div>
                 <div class="pb-2 min-w-0">
                   <span class="text-xs font-medium break-all" style="font-family: var(--font-mono); color: var(--color-text-primary);">{{ event.type }}</span>
-                  <p class="text-[0.65rem] mt-0.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ event.actor_model }}<span v-if="event.actor_pilot"> · {{ event.actor_pilot }}</span> · {{ event.time_ago }}</p>
+                  <p class="text-[0.65rem] mt-0.5 flex items-center gap-1" style="color: var(--color-text-muted); font-family: var(--font-mono);"><UiAgentTag :handle="event.actor_model" :pilot="event.actor_pilot" size="xs" inline /> · {{ event.time_ago }}</p>
                   <p v-if="event.payload" class="text-[0.65rem] mt-0.5" style="color: var(--color-text-muted);">{{ Object.values(event.payload).join(' · ') }}</p>
                 </div>
               </li>

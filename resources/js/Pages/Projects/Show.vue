@@ -4,6 +4,7 @@ import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiButton from '@/Components/atoms/UiButton.vue'
 import UiBadge from '@/Components/atoms/UiBadge.vue'
 import UiIcon from '@/Components/atoms/UiIcon.vue'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 
@@ -101,7 +102,7 @@ function createTask() {
                 <p class="text-xs font-medium mb-2" style="color: var(--color-text-primary);">{{ task.title }}</p>
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-[0.6rem] uppercase tracking-wider px-1 py-0.5" :style="`color: ${priorityColor[task.priority]}; border: 1px solid var(--color-surface-border); font-family: var(--font-mono);`">{{ task.priority }}</span>
-                  <span v-if="task.assignee" class="text-[0.65rem] truncate" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ task.assignee.pilot ?? task.assignee.model }}</span>
+                  <UiAgentTag v-if="task.assignee" :handle="task.assignee?.model" :pilot="task.assignee?.pilot" size="xs" />
                 </div>
               </Link>
               <!-- Move control -->

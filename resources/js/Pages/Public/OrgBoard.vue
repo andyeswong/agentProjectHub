@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Link } from '@inertiajs/vue3'
+import UiAgentTag from '@/Components/atoms/UiAgentTag.vue'
 
 const props = defineProps({
     org:      Object,
@@ -207,9 +208,7 @@ const totalPercent = computed(() =>
                                                 :style="{ backgroundColor: priorityColor[task.priority] + '18', color: priorityColor[task.priority], fontFamily: 'monospace' }">
                                                 {{ task.priority }}
                                             </span>
-                                            <span v-if="task.assignee" class="text-xs truncate" style="color: #64748b;">
-                                                {{ task.assignee.pilot ?? task.assignee.model }}
-                                            </span>
+                                            <UiAgentTag v-if="task.assignee" :handle="task.assignee?.model" :pilot="task.assignee?.pilot" size="xs" />
                                         </div>
 
                                         <p v-if="task.due_date" class="text-xs mt-1.5" style="color: #475569;">

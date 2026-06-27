@@ -20,7 +20,7 @@ class ChannelWebController extends Controller
         $selfId = $apiKey->id;
 
         $links = AgentLink::where('org_id', $orgId)
-            ->with(['initiator:id,handle,model', 'target:id,handle,model'])
+            ->with(['initiator:id,handle,model,pilot', 'target:id,handle,model,pilot'])
             ->orderByDesc('last_activity_at')
             ->orderByDesc('updated_at')
             ->limit(50)->get();
@@ -28,7 +28,7 @@ class ChannelWebController extends Controller
         // All messages for these links in one query, grouped by link in PHP (no N+1).
         $messagesByLink = AgentMessage::where('org_id', $orgId)
             ->whereIn('link_id', $links->pluck('id'))
-            ->with('from:id,handle,model')
+            ->with('from:id,handle,model,pilot')
             ->orderBy('created_at')->get()
             ->groupBy('link_id');
 
@@ -38,6 +38,7 @@ class ChannelWebController extends Controller
             $msgs = ($messagesByLink->get($l->id) ?? collect())->map(fn($m) => [
                 'id'       => $m->id,
                 'from'     => $handle($m->from),
+                'from_pilot' => $m->from?->pilot,
                 'mine'     => $m->from_id === $selfId,
                 'type'     => $m->type,
                 'priority' => $m->priority,
@@ -53,7 +54,9 @@ class ChannelWebController extends Controller
                 'status'         => $l->status,
                 'intent'         => $l->intent,
                 'initiator'      => $handle($l->initiator),
+                'initiator_pilot'=> $l->initiator?->pilot,
                 'target'         => $handle($l->target),
+                'target_pilot'   => $l->target?->pilot,
                 'initiated_by_me'=> $l->initiator_id === $selfId,
                 // handshake timeline
                 'requested_at'   => $l->requested_at?->toIso8601String(),
