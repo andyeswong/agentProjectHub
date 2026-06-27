@@ -72,12 +72,14 @@ const selectStyle = 'background-color: var(--color-surface-base); color: var(--c
 
 // ── Inline editor ────────────────────────────────────────────────────────────
 const editing = ref(null)
-const draft = ref({ permissions: [], personality_slug: '' })
+const draft = ref({ handle: '', permissions: [], personality_slug: '' })
 const saving = ref(false)
+const errors = ref({})
 
 function openEdit(a) {
   editing.value = a.id
-  draft.value = { permissions: [...(a.permissions || [])], personality_slug: a.personality_slug || '' }
+  errors.value = {}
+  draft.value = { handle: a.handle || '', permissions: [...(a.permissions || [])], personality_slug: a.personality_slug || '' }
 }
 function togglePerm(p) {
   const i = draft.value.permissions.indexOf(p)
@@ -85,8 +87,16 @@ function togglePerm(p) {
 }
 function save(a) {
   saving.value = true
-  router.patch(`/agents/${a.id}`, { permissions: draft.value.permissions, personality_slug: draft.value.personality_slug || null }, {
-    preserveScroll: true, onSuccess: () => { editing.value = null }, onFinish: () => saving.value = false,
+  errors.value = {}
+  router.patch(`/agents/${a.id}`, {
+    handle: draft.value.handle?.trim() || null,
+    permissions: draft.value.permissions,
+    personality_slug: draft.value.personality_slug || null,
+  }, {
+    preserveScroll: true,
+    onSuccess: () => { editing.value = null },
+    onError: (e) => { errors.value = e },
+    onFinish: () => saving.value = false,
   })
 }
 function revoke(a) { router.post(`/agents/${a.id}/revoke`, {}, { preserveScroll: true }) }
@@ -160,7 +170,7 @@ function restore(a) { router.post(`/agents/${a.id}/restore`, {}, { preserveScrol
           </div>
           <div>
             <AgentRow v-for="(a, i) in g.agents" :key="a.id" :a="a" :i="i" :editing="editing" :draft="draft" :saving="saving" :perms="PERMS" :personalities="personalities"
-              :status-of="statusOf" :select-style="selectStyle"
+              :status-of="statusOf" :select-style="selectStyle" :errors="errors"
               @open-edit="openEdit" @close-edit="editing = null" @toggle-perm="togglePerm" @save="save" @revoke="revoke" @restore="restore" />
           </div>
         </section>

@@ -65,10 +65,21 @@ class AgentWebController extends Controller
         $key = $this->find($request, $id);
 
         $data = $request->validate([
+            'handle'           => 'sometimes|nullable|string|max:80|regex:/^[a-zA-Z0-9._-]+$/',
             'permissions'      => 'sometimes|array',
             'permissions.*'    => 'string|max:40',
             'personality_slug' => 'sometimes|nullable|string|max:100',
         ]);
+
+        // Handle is how other agents address this body — keep it unique per org.
+        if (array_key_exists('handle', $data) && $data['handle'] !== $key->handle) {
+            $taken = ApiKey::where('org_id', $key->org_id)
+                ->where('handle', $data['handle'])
+                ->where('id', '!=', $key->id)->exists();
+            if ($taken) {
+                return Redirect::back()->withErrors(['handle' => "Handle '{$data['handle']}' is already taken in this org."]);
+            }
+        }
 
         $key->fill($data)->save();
 

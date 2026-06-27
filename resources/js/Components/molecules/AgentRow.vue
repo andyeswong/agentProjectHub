@@ -10,6 +10,7 @@ const props = defineProps({
   a: Object, i: Number, editing: [String, null], draft: Object,
   saving: Boolean, perms: Array, personalities: Array,
   statusOf: Function, selectStyle: String,
+  errors: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['open-edit', 'close-edit', 'toggle-perm', 'save', 'revoke', 'restore'])
 </script>
@@ -44,6 +45,16 @@ const emit = defineEmits(['open-edit', 'close-edit', 'toggle-perm', 'save', 'rev
 
     <!-- Editor -->
     <div v-if="editing === a.id" class="px-4 py-4" style="border-top: 1px solid var(--color-surface-border); background-color: var(--color-surface-sunken); box-shadow: inset 2px 0 0 var(--color-accent);">
+      <UiLabel>Handle (agent name)</UiLabel>
+      <div class="mt-1.5 mb-1">
+        <input v-model="draft.handle" type="text" placeholder="e.g. openclaw-frgo"
+          class="block w-full max-w-xs px-3 py-2 text-sm outline-none" :style="selectStyle" />
+      </div>
+      <p v-if="errors.handle" class="text-[0.65rem] mb-1" style="color: var(--color-danger); font-family: var(--font-mono);">{{ errors.handle }}</p>
+      <p class="text-[0.6rem] mb-4" style="color: var(--color-text-muted); font-family: var(--font-mono);">
+        How other agents address this body. Currently shows <span style="color: var(--color-text-secondary);">{{ a.handle || a.model }}</span>. Letters, digits, . _ - only.
+      </p>
+
       <UiLabel>Permissions</UiLabel>
       <div class="flex flex-wrap gap-1.5 mt-1.5 mb-4">
         <button v-for="p in perms" :key="p" @click="emit('toggle-perm', p)"
