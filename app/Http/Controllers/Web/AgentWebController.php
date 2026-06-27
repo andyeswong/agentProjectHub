@@ -21,13 +21,16 @@ class AgentWebController extends Controller
         $apiKey = $request->attributes->get('pilot_api_key');
         $orgId  = $apiKey->org_id;
 
+        $online = now()->subSeconds(90);
+
         $agents = ApiKey::where('org_id', $orgId)
             ->where('owner_type', 'agent')
-            ->with('organization:id,name,slug')
+            ->with('organization:id,name,slug', 'presence:agent_id,status,last_heartbeat')
             ->orderByDesc('last_active_at')
             ->get()
             ->map(fn($a) => [
                 'id'                 => $a->id,
+                'handle'             => $a->handle ?? $a->model,
                 'model'              => $a->model,
                 'model_provider'     => $a->model_provider,
                 'client_type'        => $a->client_type,
@@ -39,6 +42,8 @@ class AgentWebController extends Controller
                 'system_prompt_hash' => $a->system_prompt_hash ? substr($a->system_prompt_hash, 0, 16) . '...' : null,
                 'last_active_at'     => $a->last_active_at?->toISOString(),
                 'last_active_ago'    => $a->last_active_at?->diffForHumans(),
+                'available'          => $a->presence?->status === 'available',
+                'online'             => $a->presence && $a->presence->last_heartbeat && $a->presence->last_heartbeat->gt($online),
                 'is_revoked'         => $a->isRevoked(),
                 'registered_at'      => $a->created_at->toISOString(),
             ]);

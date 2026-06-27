@@ -5,9 +5,9 @@ import UiLabel from '@/Components/atoms/UiLabel.vue'
 import UiHeading from '@/Components/atoms/UiHeading.vue'
 import UiButton from '@/Components/atoms/UiButton.vue'
 import UiIcon from '@/Components/atoms/UiIcon.vue'
-import UiStatusDot from '@/Components/atoms/UiStatusDot.vue'
+import AgentRow from '@/Components/molecules/AgentRow.vue'
 import { router } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps({ agents: Array, personalities: { type: Array, default: () => [] } })
 
@@ -15,7 +15,62 @@ const inviteOpen = ref(false)
 const PLUS = 'M12 4v16m8-8H4'
 const PERMS = ['read', 'write', 'comment', 'comms', 'reveal_secrets', 'read_projects', 'write_tasks', 'post_comments', 'manage_agents', 'admin']
 
-// ── Inline editor ───────────────────────────────────────────────────────────
+// ── Filters ──────────────────────────────────────────────────────────────────
+const q = ref('')
+const fPilot = ref('')
+const fProvider = ref('')
+const fClient = ref('')
+const fStatus = ref('all')      // all | online | available | active | revoked
+const groupBy = ref(true)        // group rows under pilot headers
+
+const uniq = (key) => [...new Set(props.agents.map(a => a[key]).filter(Boolean))].sort()
+const pilots = computed(() => uniq('pilot'))
+const providers = computed(() => uniq('model_provider'))
+const clients = computed(() => uniq('client_type'))
+
+const filtered = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  return props.agents.filter(a => {
+    if (fPilot.value && a.pilot !== fPilot.value) return false
+    if (fProvider.value && a.model_provider !== fProvider.value) return false
+    if (fClient.value && a.client_type !== fClient.value) return false
+    if (fStatus.value === 'revoked' && !a.is_revoked) return false
+    if (fStatus.value === 'active' && a.is_revoked) return false
+    if (fStatus.value === 'online' && !a.online) return false
+    if (fStatus.value === 'available' && !a.available) return false
+    if (term) {
+      const hay = `${a.handle} ${a.model} ${a.pilot} ${a.client_type} ${a.personality_slug} ${(a.permissions || []).join(' ')}`.toLowerCase()
+      if (!hay.includes(term)) return false
+    }
+    return true
+  })
+})
+
+// Grouped by pilot — pilots alphabetical, "no pilot" last (sorted as 'ÿ').
+const grouped = computed(() => {
+  const map = new Map()
+  for (const a of filtered.value) {
+    const k = a.pilot || 'ÿ'
+    if (!map.has(k)) map.set(k, [])
+    map.get(k).push(a)
+  }
+  return [...map.entries()].sort((x, y) => x[0].localeCompare(y[0]))
+    .map(([k, list]) => ({ pilot: k === 'ÿ' ? null : k, agents: list }))
+})
+
+const activeFilters = computed(() => fPilot.value || fProvider.value || fClient.value || fStatus.value !== 'all' || q.value.trim())
+function clearFilters() { q.value = ''; fPilot.value = ''; fProvider.value = ''; fClient.value = ''; fStatus.value = 'all' }
+
+function statusOf(a) {
+  if (a.is_revoked) return { tone: 'danger', label: 'revoked', color: 'var(--color-danger)' }
+  if (a.online) return { tone: 'success', label: 'online', color: 'var(--color-success)' }
+  if (a.available) return { tone: 'warning', label: 'available', color: 'var(--color-warning)' }
+  return { tone: 'neutral', label: 'idle', color: 'var(--color-text-muted)' }
+}
+
+const selectStyle = 'background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);'
+
+// ── Inline editor ────────────────────────────────────────────────────────────
 const editing = ref(null)
 const draft = ref({ permissions: [], personality_slug: '' })
 const saving = ref(false)
@@ -52,66 +107,70 @@ function restore(a) { router.post(`/agents/${a.id}/restore`, {}, { preserveScrol
 
       <InviteAgentPanel v-if="inviteOpen" />
 
+      <!-- ── Filter toolbar ── -->
+      <div class="space-y-3" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); padding: 0.75rem 1rem;">
+        <div class="flex flex-wrap items-center gap-2">
+          <input v-model="q" type="text" placeholder="Search model, handle, pilot, permission…"
+            class="flex-1 min-w-[12rem] px-3 py-2 text-sm outline-none" :style="selectStyle" />
+          <select v-model="fPilot" class="px-3 py-2 text-sm outline-none" :style="selectStyle">
+            <option value="">All pilots</option>
+            <option v-for="p in pilots" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <select v-model="fProvider" class="px-3 py-2 text-sm outline-none" :style="selectStyle">
+            <option value="">All providers</option>
+            <option v-for="p in providers" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <select v-model="fClient" class="px-3 py-2 text-sm outline-none" :style="selectStyle">
+            <option value="">All clients</option>
+            <option v-for="c in clients" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center">
+            <button v-for="(s, si) in ['all', 'online', 'available', 'active', 'revoked']" :key="s" @click="fStatus = s"
+              class="text-[0.65rem] uppercase tracking-wider px-2.5 py-1 transition-colors"
+              :style="(fStatus === s
+                ? 'background-color: var(--color-accent); color: var(--color-accent-contrast); border: 1px solid var(--color-accent);'
+                : 'color: var(--color-text-muted); border: 1px solid var(--color-surface-border);') + (si > 0 ? ' border-left: none;' : '') + ' font-family: var(--font-mono);'">{{ s }}</button>
+          </div>
+          <label class="flex items-center gap-1.5 text-[0.65rem] uppercase tracking-wider cursor-pointer" style="font-family: var(--font-mono); color: var(--color-text-muted);">
+            <input type="checkbox" v-model="groupBy" /> Group by pilot
+          </label>
+          <span class="text-[0.65rem] ml-auto" style="font-family: var(--font-mono); color: var(--color-text-muted);">
+            {{ filtered.length }} / {{ agents.length }} agents
+          </span>
+          <button v-if="activeFilters" @click="clearFilters" class="text-[0.65rem] uppercase tracking-wider link-underline" style="color: var(--color-accent);">clear</button>
+        </div>
+      </div>
+
       <div v-if="agents.length === 0" class="p-10 text-center text-sm" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); color: var(--color-text-muted);">
         No agents registered yet.
       </div>
+      <div v-else-if="filtered.length === 0" class="p-10 text-center text-sm" style="background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); color: var(--color-text-muted);">
+        No agents match these filters.
+      </div>
 
+      <!-- ── Grouped by pilot ── -->
+      <div v-else-if="groupBy" class="space-y-6">
+        <section v-for="g in grouped" :key="g.pilot || 'none'">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs uppercase tracking-wider" style="font-family: var(--font-mono); color: var(--color-text-primary);">{{ g.pilot || '— no pilot —' }}</span>
+            <span class="text-[0.6rem]" style="font-family: var(--font-mono); color: var(--color-text-muted);">{{ g.agents.length }}</span>
+            <span class="flex-1" style="height:1px; background-color: var(--color-surface-border);"></span>
+          </div>
+          <div>
+            <AgentRow v-for="(a, i) in g.agents" :key="a.id" :a="a" :i="i" :editing="editing" :draft="draft" :saving="saving" :perms="PERMS" :personalities="personalities"
+              :status-of="statusOf" :select-style="selectStyle"
+              @open-edit="openEdit" @close-edit="editing = null" @toggle-perm="togglePerm" @save="save" @revoke="revoke" @restore="restore" />
+          </div>
+        </section>
+      </div>
+
+      <!-- ── Flat list ── -->
       <div v-else>
-        <div v-for="(a, i) in agents" :key="a.id"
-          :style="`background-color: var(--color-surface-elevated); border: 1px solid var(--color-surface-border); ${i > 0 ? 'border-top: none;' : ''} ${a.is_revoked ? 'opacity: 0.55;' : ''}`">
-
-          <!-- Row -->
-          <div class="flex items-center gap-4 px-4 py-3">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-sm font-medium" style="font-family: var(--font-mono); color: var(--color-text-primary);">{{ a.model ?? '—' }}</span>
-                <span class="text-[0.6rem] uppercase tracking-wider px-1 py-0.5" style="font-family: var(--font-mono); color: var(--color-text-secondary); border: 1px solid var(--color-surface-border);">{{ a.model_provider ?? '—' }}</span>
-                <span class="text-[0.6rem] uppercase tracking-wider px-1 py-0.5" style="font-family: var(--font-mono); color: var(--color-text-muted); border: 1px solid var(--color-surface-border);">{{ a.client_type }}</span>
-                <span v-if="a.personality_slug" class="text-[0.6rem] uppercase tracking-wider px-1 py-0.5" style="font-family: var(--font-mono); color: var(--color-accent); border: 1px solid var(--color-accent);">self:{{ a.personality_slug }}</span>
-              </div>
-              <p class="text-xs mt-0.5" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ a.pilot ?? '—' }}<span v-if="a.pilot_contact"> · {{ a.pilot_contact }}</span> · {{ a.last_active_at ? a.last_active_ago : 'never' }}</p>
-            </div>
-
-            <div class="hidden lg:flex flex-wrap gap-1 max-w-[40%] justify-end">
-              <span v-for="perm in (a.permissions ?? [])" :key="perm" class="text-[0.6rem] px-1 py-0.5" style="background-color: var(--color-surface-base); color: var(--color-text-secondary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);">{{ perm }}</span>
-            </div>
-
-            <div class="flex items-center gap-3 shrink-0">
-              <span v-if="a.is_revoked" class="text-[0.65rem] uppercase tracking-wider" style="color: var(--color-danger); font-family: var(--font-mono);">revoked</span>
-              <span v-else class="flex items-center gap-1.5"><UiStatusDot tone="success" :size="6" /><span class="text-xs" style="color: var(--color-success);">active</span></span>
-              <button @click="editing === a.id ? editing = null : openEdit(a)" class="text-[0.65rem] uppercase tracking-wider link-underline" style="color: var(--color-text-muted);">{{ editing === a.id ? 'close' : 'edit' }}</button>
-            </div>
-          </div>
-
-          <!-- Editor -->
-          <div v-if="editing === a.id" class="px-4 py-4" style="border-top: 1px solid var(--color-surface-border); background-color: var(--color-surface-sunken); box-shadow: inset 2px 0 0 var(--color-accent);">
-            <UiLabel>Permissions</UiLabel>
-            <div class="flex flex-wrap gap-1.5 mt-1.5 mb-4">
-              <button v-for="p in PERMS" :key="p" @click="togglePerm(p)"
-                class="text-[0.65rem] uppercase tracking-wider px-2 py-1 transition-colors"
-                :style="draft.permissions.includes(p)
-                  ? 'background-color: var(--color-accent); color: var(--color-accent-contrast); border: 1px solid var(--color-accent); font-family: var(--font-mono);'
-                  : 'color: var(--color-text-muted); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);'">
-                {{ p }}
-              </button>
-            </div>
-
-            <div class="flex flex-wrap items-end gap-4">
-              <div>
-                <UiLabel>Personality (self)</UiLabel>
-                <select v-model="draft.personality_slug" class="block mt-1.5 px-3 py-2 text-sm outline-none" style="background-color: var(--color-surface-base); color: var(--color-text-primary); border: 1px solid var(--color-surface-border); font-family: var(--font-mono);">
-                  <option value="">— none —</option>
-                  <option v-for="slug in personalities" :key="slug" :value="slug">{{ slug }}</option>
-                </select>
-              </div>
-              <div class="flex items-center gap-2">
-                <UiButton variant="solid" size="sm" :disabled="saving" @click="save(a)">{{ saving ? 'Saving…' : 'Save' }}</UiButton>
-                <UiButton v-if="!a.is_revoked" variant="danger" size="sm" @click="revoke(a)">Revoke</UiButton>
-                <UiButton v-else variant="outline" size="sm" @click="restore(a)">Restore</UiButton>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AgentRow v-for="(a, i) in filtered" :key="a.id" :a="a" :i="i" :editing="editing" :draft="draft" :saving="saving" :perms="PERMS" :personalities="personalities"
+          :status-of="statusOf" :select-style="selectStyle"
+          @open-edit="openEdit" @close-edit="editing = null" @toggle-perm="togglePerm" @save="save" @revoke="revoke" @restore="restore" />
       </div>
     </div>
   </AppLayout>
