@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AgentMemory;
 use App\Models\AgentSession;
 use App\Models\ApiKey;
+use App\Models\Pilot;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -27,14 +28,20 @@ class PilotWebController extends Controller
         // key id -> stable pilot IDENTITY (pilot_id when set; else a normalized
         // name) so free-text casing/spacing variants don't fragment one human.
         // We also remember a human DISPLAY name per identity.
+        // Canonical names live in the pilots table (display_name); that's the
+        // single source of truth — api_keys.pilot is just a denormalized cache.
+        $canonical = Pilot::where('org_id', $orgId)->pluck('display_name', 'id');
+
         $allKeys = ApiKey::where('org_id', $orgId)->get(['id', 'pilot', 'pilot_id']);
         $identityOf = [];
         $displayOf  = [];
         foreach ($allKeys as $k) {
             [$id, $name] = $this->identity($k->pilot_id, $k->pilot);
             $identityOf[$k->id] = $id;
-            // Prefer the first non-unassigned, non-empty display we encounter.
-            if (!isset($displayOf[$id]) || ($displayOf[$id] === self::UNASSIGNED && $name !== self::UNASSIGNED)) {
+            // Canonical pilots.display_name wins; fall back to the key's string.
+            if ($k->pilot_id && $canonical->has($k->pilot_id)) {
+                $displayOf[$id] = $canonical[$k->pilot_id];
+            } elseif (!isset($displayOf[$id]) || ($displayOf[$id] === self::UNASSIGNED && $name !== self::UNASSIGNED)) {
                 $displayOf[$id] = $name;
             }
         }
