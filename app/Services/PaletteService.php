@@ -175,21 +175,23 @@ class PaletteService
             return $roles;
         }
 
-        // Text: whatever contrasts hardest with the background.
-        usort($rest, fn ($a, $b) => $this->contrast($rgb($b['hex']), $rgb($bg)) <=> $this->contrast($rgb($a['hex']), $rgb($bg)));
-        $text = $rest[0]['hex'];
-        if ($this->contrast($rgb($text), $rgb($bg)) >= 3.0) {
-            $roles['text'] = $text;
+        // Accent BEFORE text. The accent is the most saturated color on the
+        // page; text is nearly always a neutral. Naming text first lets a
+        // vivid accent steal the label whenever it happens to contrast most —
+        // which is exactly what a two-colour image does.
+        $saturated = array_values(array_filter($rest, fn ($c) => $this->saturation($rgb($c['hex'])) > 0.25));
+        if ($saturated) {
+            usort($saturated, fn ($a, $b) => $this->saturation($rgb($b['hex'])) <=> $this->saturation($rgb($a['hex'])));
+            $roles['accent'] = $saturated[0]['hex'];
         }
 
-        // Accent: the most saturated color that is neither background nor text.
-        $candidates = array_values(array_filter(
-            $rest,
-            fn ($c) => $c['hex'] !== ($roles['text'] ?? null) && $this->saturation($rgb($c['hex'])) > 0.25,
-        ));
-        if ($candidates) {
-            usort($candidates, fn ($a, $b) => $this->saturation($rgb($b['hex'])) <=> $this->saturation($rgb($a['hex'])));
-            $roles['accent'] = $candidates[0]['hex'];
+        // Text: hardest contrast against the background, among what is left.
+        $textCandidates = array_values(array_filter($rest, fn ($c) => $c['hex'] !== ($roles['accent'] ?? null)));
+        if ($textCandidates) {
+            usort($textCandidates, fn ($a, $b) => $this->contrast($rgb($b['hex']), $rgb($bg)) <=> $this->contrast($rgb($a['hex']), $rgb($bg)));
+            if ($this->contrast($rgb($textCandidates[0]['hex']), $rgb($bg)) >= 3.0) {
+                $roles['text'] = $textCandidates[0]['hex'];
+            }
         }
 
         // Surface: a near-neutral close to the background but distinguishable —
