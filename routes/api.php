@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AgentLinkController;
 use App\Http\Controllers\Api\V1\AgentMessageController;
 use App\Http\Controllers\Api\V1\AssetController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BrandController;
 use App\Http\Controllers\Api\V1\CommentController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\HealthController;
@@ -95,6 +96,14 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::get('/assets/{id}/raw',                                [AssetController::class, 'raw']);
         Route::get('/assets/{id}',                                    [AssetController::class, 'show']);
         Route::delete('/assets/{id}',                                 [AssetController::class, 'destroy']);
+
+        // Brands (F2) — resolvable visual identity; references assets, never owns them
+        Route::post('/brands/resolve',                                [BrandController::class, 'resolve']);
+        Route::get('/brands',                                         [BrandController::class, 'index']);
+        Route::post('/brands',                                        [BrandController::class, 'upsert']);
+        Route::post('/brands/{id}/assets',                            [BrandController::class, 'attachAsset']);
+        Route::delete('/brands/{brandId}/assets/{assetId}',           [BrandController::class, 'detachAsset']);
+        Route::get('/brands/{slug}',                                  [BrandController::class, 'show']);
 
         // Agent Channels — 1:1 real-time comms between agents (handshake + messaging)
         Route::prefix('agents')->group(function () {

@@ -52,17 +52,29 @@ function clearSearch() {
 }
 
 // ── Upload ───────────────────────────────────────────────────────────────
+const MAX_BYTES = 8 * 1024 * 1024   // matches AssetController::MAX_BYTES
+
 const fileInput   = ref(null)
 const selected    = ref(null)   // { name, mime, sizeKb, previewUrl }
 const b64         = ref('')
 const uploadKind  = ref('reference')
 const description = ref('')
 const uploading   = ref(false)
+const uploadError = ref('')
 
 function pickFile() { fileInput.value?.click() }
 function onFilePicked(e) {
   const f = e.target.files?.[0]
   if (!f) return
+  uploadError.value = ''
+
+  // Reject oversized files here so the user gets a message instead of a 413.
+  if (f.size > MAX_BYTES) {
+    uploadError.value = `“${f.name}” pesa ${(f.size / 1048576).toFixed(1)} MB. El máximo por asset es 8 MB.`
+    resetUpload()
+    return
+  }
+
   selected.value = { name: f.name, mime: f.type, sizeKb: Math.max(1, Math.round(f.size / 1024)), previewUrl: URL.createObjectURL(f) }
   const reader = new FileReader()
   reader.onload = () => { b64.value = String(reader.result).split(',')[1] ?? '' }
@@ -162,6 +174,8 @@ function fmtSize(bytes) {
             <div class="mt-3">
               <UiInput v-model="description" placeholder="Descripción (se embebe para búsqueda semántica)…" />
             </div>
+
+            <p v-if="uploadError" class="mt-3 text-xs" style="color: var(--color-danger, #dc2626);">{{ uploadError }}</p>
 
             <div class="mt-3 flex items-center gap-2">
               <UiButton :disabled="!b64 || uploading" @click="upload">

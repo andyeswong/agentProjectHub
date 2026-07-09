@@ -11,7 +11,7 @@ class Project extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['workspace_id', 'created_by', 'name', 'description', 'status'];
+    protected $fillable = ['workspace_id', 'brand_id', 'created_by', 'name', 'description', 'status'];
 
     public function workspace(): BelongsTo
     {

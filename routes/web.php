@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\AgentWebController;
 use App\Http\Controllers\Web\AssetWebController;
+use App\Http\Controllers\Web\BrandWebController;
 use App\Http\Controllers\Web\PersonalityWebController;
 use App\Http\Controllers\Web\SessionWebController;
 use App\Http\Controllers\Web\EventWebController;
@@ -65,6 +66,12 @@ Route::middleware('pilot.auth')->group(function () {
     Route::post('/assets', [AssetWebController::class, 'store'])->name('assets.store');
     Route::get('/assets/{id}/raw', [AssetWebController::class, 'raw'])->name('assets.raw');
     Route::delete('/assets/{id}', [AssetWebController::class, 'destroy'])->name('assets.destroy');
+    Route::get('/brands', [BrandWebController::class, 'index'])->name('brands.index');
+    Route::post('/brands', [BrandWebController::class, 'store'])->name('brands.store');
+    Route::get('/brands/{slug}', [BrandWebController::class, 'show'])->name('brands.show');
+    Route::patch('/brands/{slug}', [BrandWebController::class, 'update'])->name('brands.update');
+    Route::post('/brands/{slug}/assets', [BrandWebController::class, 'attach'])->name('brands.assets.attach');
+    Route::delete('/brands/{slug}/assets/{assetId}', [BrandWebController::class, 'detach'])->name('brands.assets.detach');
     Route::get('/memory', [MemoryWebController::class, 'index'])->name('memory.index');
     Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');
     Route::get('/memory/{id}', [MemoryWebController::class, 'show'])->name('memory.show');
