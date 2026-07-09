@@ -58,6 +58,15 @@ class BrandWebController extends Controller
         $brand = Brand::whereIn('workspace_id', $wsIds)->where('slug', $slug)->firstOrFail();
         $resolved = $this->brands->resolve($wsIds, $slug);
 
+        // BrandService hands agents the bearer-authed API url. The panel is
+        // session-authed, so point its <img> tags at the web route instead —
+        // otherwise every linked asset renders as a 401.
+        foreach ($resolved['assets'] ?? [] as $role => $list) {
+            foreach ($list as $i => $a) {
+                $resolved['assets'][$role][$i]['raw_url'] = url("/assets/{$a['id']}/raw");
+            }
+        }
+
         // Library for the attach picker — every asset in the org, images first.
         $library = Asset::whereIn('workspace_id', $wsIds)
             ->orderByDesc('created_at')

@@ -126,9 +126,9 @@ function saveTokens() {
             class="text-left transition-opacity hover:opacity-80"
             style="border: 1px solid var(--color-surface-border);">
             <div :style="{ backgroundColor: hex, height: '56px' }" />
-            <div class="px-2 py-1.5">
-              <p class="text-xs" style="color: var(--color-text-primary); font-family: var(--font-mono);">--color-{{ key }}</p>
-              <p class="text-xs flex items-center gap-1" style="color: var(--color-text-muted); font-family: var(--font-mono);">
+            <div class="px-2 py-1.5 overflow-hidden">
+              <p class="text-xs truncate" style="color: var(--color-text-primary); font-family: var(--font-mono);">--color-{{ key }}</p>
+              <p class="text-[10px] flex items-center gap-1" style="color: var(--color-text-muted); font-family: var(--font-mono); overflow-wrap: anywhere;">
                 {{ hex }}
                 <UiIcon v-if="copied === key" :path="ICONS.check" :size="11" />
               </p>
