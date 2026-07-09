@@ -110,16 +110,32 @@ class BrandController extends Controller
             return $this->noWorkspaceError();
         }
 
-        // parent_slug -> parent_id, resolved within the same workspace.
-        if (! empty($data['parent_slug'])) {
-            $parent = Brand::where('workspace_id', $workspace->id)->where('slug', $data['parent_slug'])->first();
-            if (! $parent) {
-                return response()->json(['error' => 'parent_not_found', 'hint' => "No brand '{$data['parent_slug']}' in this workspace."], 422);
+        // parent_slug -> parent_id. Passing parent_slug: null DETACHES the
+        // brand; omitting the key entirely leaves the parent alone.
+        if ($request->exists('parent_slug')) {
+            $slug = $data['parent_slug'] ?? null;
+
+            if ($slug === null || $slug === '') {
+                $data['parent_id'] = null;                       // disinherit
+            } else {
+                $parent = Brand::where('workspace_id', $workspace->id)->where('slug', $slug)->first();
+                if (! $parent) {
+                    return response()->json(['error' => 'parent_not_found', 'hint' => "No brand '{$slug}' in this workspace."], 422);
+                }
+                if ($parent->slug === $data['slug']) {
+                    return response()->json(['error' => 'self_parent'], 422);
+                }
+
+                $existing = Brand::where('workspace_id', $workspace->id)->where('slug', $data['slug'])->first();
+                if ($this->brands->wouldCycle($existing, $parent->id)) {
+                    return response()->json([
+                        'error' => 'inheritance_cycle',
+                        'hint'  => "'{$slug}' already descends from '{$data['slug']}'.",
+                    ], 422);
+                }
+
+                $data['parent_id'] = $parent->id;
             }
-            if ($parent->slug === $data['slug']) {
-                return response()->json(['error' => 'self_parent'], 422);
-            }
-            $data['parent_id'] = $parent->id;
         }
 
         [$brand, $created] = $this->brands->upsert($data, $workspace->id, $apiKey);

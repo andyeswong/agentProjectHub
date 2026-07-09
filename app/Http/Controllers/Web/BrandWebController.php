@@ -100,8 +100,21 @@ class BrandWebController extends Controller
             }
         }
 
+        // Candidate parents: every other brand in the org. The backend still
+        // rejects cycles, so the picker can stay simple.
+        $others = Brand::whereIn('workspace_id', $wsIds)
+            ->where('id', '!=', $brand->id)
+            ->orderBy('slug')
+            ->get(['id', 'slug', 'name']);
+
+        $parentSlug = $brand->parent_id
+            ? Brand::where('id', $brand->parent_id)->value('slug')
+            : null;
+
         return Inertia::render('Brands/Show', [
-            'proposal' => $proposal,
+            'proposal'    => $proposal,
+            'others'      => $others,
+            'parent_slug' => $parentSlug,
             'brand'    => [
                 'id'         => $brand->id,
                 'slug'       => $brand->slug,
@@ -155,12 +168,36 @@ class BrandWebController extends Controller
         $brand = Brand::whereIn('workspace_id', $wsIds)->where('slug', $slug)->firstOrFail();
 
         $data = $request->validate([
-            'tokens'  => 'nullable|array',
-            'rules'   => 'nullable|array',
-            'rules.*' => 'string',
-            'voice'   => 'nullable|array',
-            'name'    => 'nullable|string|max:120',
+            'tokens'      => 'nullable|array',
+            'rules'       => 'nullable|array',
+            'rules.*'     => 'string',
+            'voice'       => 'nullable|array',
+            'name'        => 'nullable|string|max:120',
+            'parent_slug' => 'nullable|string|max:100',
         ]);
+
+        // Present-but-empty parent_slug means "disinherit"; an absent key means
+        // "leave the parent alone".
+        if ($request->exists('parent_slug')) {
+            $p = $data['parent_slug'] ?? null;
+
+            if ($p === null || $p === '') {
+                $data['parent_id'] = null;
+            } else {
+                $parent = Brand::whereIn('workspace_id', $wsIds)->where('slug', $p)->first();
+                if (! $parent) {
+                    return back()->with('error', "No existe la marca “{$p}”.");
+                }
+                if ($parent->id === $brand->id) {
+                    return back()->with('error', 'Una marca no puede heredar de sí misma.');
+                }
+                if ($this->brands->wouldCycle($brand, $parent->id)) {
+                    return back()->with('error', "“{$p}” ya desciende de “{$slug}”: sería un ciclo.");
+                }
+                $data['parent_id'] = $parent->id;
+            }
+            unset($data['parent_slug']);
+        }
 
         $this->brands->upsert(array_merge($data, ['slug' => $slug]), $brand->workspace_id, $apiKey);
 

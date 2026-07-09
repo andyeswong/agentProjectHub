@@ -10,7 +10,10 @@ import UiRule from '@/Components/atoms/UiRule.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 
-const props = defineProps({ brand: Object, resolved: Object, library: Array, linked: Array, proposal: Object })
+const props = defineProps({
+  brand: Object, resolved: Object, library: Array, linked: Array,
+  proposal: Object, others: Array, parent_slug: String,
+})
 
 const ICONS = {
   copy:  'M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3',
@@ -70,6 +73,21 @@ function detach(assetId) {
   router.delete(`/brands/${props.brand.slug}/assets/${assetId}`, { preserveScroll: true })
 }
 
+// ── Inheritance: adopt or disinherit a parent brand ──────────────────────
+const editingParent = ref(false)
+const parentDraft   = ref(props.parent_slug ?? '')
+
+function saveParent() {
+  // An empty value posts parent_slug: null — that's the disinherit signal.
+  router.patch(`/brands/${props.brand.slug}`, { parent_slug: parentDraft.value || null }, {
+    preserveScroll: true, onSuccess: () => { editingParent.value = false },
+  })
+}
+function disinherit() {
+  parentDraft.value = ''
+  router.patch(`/brands/${props.brand.slug}`, { parent_slug: null }, { preserveScroll: true })
+}
+
 // ── Extract palette from an image (F3) ───────────────────────────────────
 const extracting = ref(false)
 const images = computed(() => (props.library ?? []).filter(a => a.is_image))
@@ -117,8 +135,35 @@ function saveTokens() {
         <div class="flex items-center gap-2">
           <UiBadge v-if="brand.is_default">default</UiBadge>
           <UiBadge v-if="resolved?.inherits">hereda: {{ layers.map(l => l.slug).join(' → ') }}</UiBadge>
+          <UiButton variant="ghost" @click="editingParent = !editingParent">
+            {{ editingParent ? 'Cerrar' : (parent_slug ? 'Cambiar herencia' : 'Heredar de…') }}
+          </UiButton>
         </div>
       </div>
+
+      <!-- ── Inheritance control ── -->
+      <UiCard v-if="editingParent" class="mt-3">
+        <UiLabel>Herencia</UiLabel>
+        <p class="text-xs mt-1" style="color: var(--color-text-muted);">
+          Solo para <b>sub-marcas de esta misma marca</b>. Dos marcas hermanas de la misma empresa no heredan una de otra:
+          Fanta no hereda de Coca-Cola.
+        </p>
+        <div class="mt-3 flex items-center gap-2 flex-wrap">
+          <select v-model="parentDraft" class="text-sm px-3 py-2"
+            style="background-color: var(--color-surface-base); border: 1px solid var(--color-surface-border); color: var(--color-text-primary);">
+            <option value="">— ninguna (marca raíz) —</option>
+            <option v-for="o in others" :key="o.id" :value="o.slug">{{ o.slug }}</option>
+          </select>
+          <UiButton @click="saveParent">Guardar</UiButton>
+          <UiButton v-if="parent_slug" variant="secondary" @click="disinherit">
+            Desheredar de “{{ parent_slug }}”
+          </UiButton>
+        </div>
+        <p v-if="parent_slug" class="mt-3 text-xs" style="color: var(--color-text-muted);">
+          Al desheredar, esta marca deja de recibir los tokens y reglas de <b>{{ parent_slug }}</b>.
+          Lo suyo propio no se toca; los assets enlazados tampoco.
+        </p>
+      </UiCard>
 
       <!-- ── Identity header: painted with the BRAND's own tokens ── -->
       <div class="mt-4 p-8 flex items-center gap-6 flex-wrap"

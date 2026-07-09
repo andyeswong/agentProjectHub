@@ -173,14 +173,46 @@ class BrandService
 
     // ── Mutations ───────────────────────────────────────────────────────────
 
+    /**
+     * Would pointing $brand at $newParentId close a loop? A brand cannot
+     * inherit from itself, nor from any of its own descendants.
+     */
+    public function wouldCycle(?Brand $brand, ?string $newParentId): bool
+    {
+        if (! $brand || ! $newParentId) {
+            return false;
+        }
+        if ($newParentId === $brand->id) {
+            return true;
+        }
+
+        $seen = [];
+        $node = Brand::find($newParentId);
+        while ($node && ! isset($seen[$node->id])) {
+            if ($node->id === $brand->id) {
+                return true;   // the candidate parent descends from us
+            }
+            $seen[$node->id] = true;
+            $node = $node->parent_id ? Brand::find($node->parent_id) : null;
+        }
+
+        return false;
+    }
+
     /** Idempotent upsert on (workspace_id, slug). Bumps version on update. */
     public function upsert(array $data, string $workspaceId, $actor): array
     {
         $existing = Brand::where('workspace_id', $workspaceId)->where('slug', $data['slug'])->first();
 
+        // Distinguish "parent not mentioned" (keep it) from "parent = null"
+        // (detach). A plain ?? would make disinheriting impossible.
+        $parentId = array_key_exists('parent_id', $data)
+            ? $data['parent_id']
+            : ($existing->parent_id ?? null);
+
         $attrs = [
             'name'            => $data['name']       ?? ($existing->name ?? null),
-            'parent_id'       => $data['parent_id']  ?? ($existing->parent_id ?? null),
+            'parent_id'       => $parentId,
             'tokens'          => $data['tokens']     ?? ($existing->tokens ?? null),
             'voice'           => $data['voice']      ?? ($existing->voice ?? null),
             'rules'           => $data['rules']      ?? ($existing->rules ?? null),
