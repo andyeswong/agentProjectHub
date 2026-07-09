@@ -9,7 +9,7 @@ import UiIcon from '@/Components/atoms/UiIcon.vue'
 import UiInput from '@/Components/atoms/UiInput.vue'
 import UiRule from '@/Components/atoms/UiRule.vue'
 import { router } from '@inertiajs/vue3'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   assets: Array, stats: Object, filters: Object, search_mode: String,
@@ -63,23 +63,65 @@ const uploading   = ref(false)
 const uploadError = ref('')
 
 function pickFile() { fileInput.value?.click() }
-function onFilePicked(e) {
-  const f = e.target.files?.[0]
+
+/** Single entry point for a File, whoever produced it: picker, paste or drop. */
+function acceptFile(f, fallbackName) {
   if (!f) return
   uploadError.value = ''
 
   // Reject oversized files here so the user gets a message instead of a 413.
   if (f.size > MAX_BYTES) {
-    uploadError.value = `“${f.name}” pesa ${(f.size / 1048576).toFixed(1)} MB. El máximo por asset es 8 MB.`
+    uploadError.value = `“${f.name || fallbackName}” pesa ${(f.size / 1048576).toFixed(1)} MB. El máximo por asset es 8 MB.`
     resetUpload()
     return
   }
 
-  selected.value = { name: f.name, mime: f.type, sizeKb: Math.max(1, Math.round(f.size / 1024)), previewUrl: URL.createObjectURL(f) }
+  // Pasted screenshots arrive as a generic "image.png" — stamp them so the
+  // library doesn't fill up with a dozen files of the same name.
+  const name = f.name && f.name !== 'image.png' ? f.name : (fallbackName ?? f.name ?? 'captura.png')
+
+  selected.value = { name, mime: f.type, sizeKb: Math.max(1, Math.round(f.size / 1024)), previewUrl: URL.createObjectURL(f) }
   const reader = new FileReader()
   reader.onload = () => { b64.value = String(reader.result).split(',')[1] ?? '' }
   reader.readAsDataURL(f)
 }
+
+function onFilePicked(e) { acceptFile(e.target.files?.[0]) }
+
+function stamp() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+}
+
+/** Ctrl/Cmd+V anywhere on the page: take a screenshot straight from the clipboard. */
+function onPaste(e) {
+  const items = e.clipboardData?.items ?? []
+  for (const item of items) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const f = item.getAsFile()
+      if (f) {
+        e.preventDefault()
+        const ext = (item.type.split('/')[1] || 'png').replace('jpeg', 'jpg')
+        acceptFile(f, `captura-${stamp()}.${ext}`)
+        pasted.value = true
+        setTimeout(() => (pasted.value = false), 1500)
+      }
+      return
+    }
+  }
+}
+
+const pasted   = ref(false)
+const dragging = ref(false)
+function onDrop(e) {
+  dragging.value = false
+  acceptFile(e.dataTransfer?.files?.[0], `captura-${stamp()}.png`)
+}
+
+onMounted(() => window.addEventListener('paste', onPaste))
+onUnmounted(() => window.removeEventListener('paste', onPaste))
+
 function resetUpload() {
   selected.value = null; b64.value = ''; description.value = ''; uploadKind.value = 'reference'
   if (fileInput.value) fileInput.value.value = ''
@@ -139,14 +181,16 @@ function fmtSize(bytes) {
         <div class="flex items-start gap-4 flex-wrap">
           <input ref="fileInput" type="file" class="hidden" @change="onFilePicked" />
 
-          <!-- Preview / drop target -->
+          <!-- Preview / paste + drop target -->
           <button
             type="button" @click="pickFile"
+            @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop"
             class="shrink-0 flex items-center justify-center overflow-hidden transition-colors"
-            style="width: 96px; height: 96px; border: 1px dashed var(--color-surface-border); background-color: var(--color-surface-base);"
+            :style="{ width: '96px', height: '96px', backgroundColor: 'var(--color-surface-base)',
+                      border: `1px dashed ${dragging || pasted ? 'var(--color-accent)' : 'var(--color-surface-border)'}` }"
           >
             <img v-if="selected?.previewUrl && selected.mime?.startsWith('image/')" :src="selected.previewUrl" class="w-full h-full object-cover" alt="preview" />
-            <UiIcon v-else :path="ICONS.upload" :size="26" style="color: var(--color-text-muted);" />
+            <UiIcon v-else :path="ICONS.upload" :size="26" :style="{ color: dragging ? 'var(--color-accent)' : 'var(--color-text-muted)' }" />
           </button>
 
           <!-- Fields -->
@@ -157,6 +201,9 @@ function fmtSize(bytes) {
               </UiButton>
               <span v-if="selected" class="text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">
                 {{ selected.name }} · {{ selected.sizeKb }} KB
+              </span>
+              <span v-else class="text-xs" style="color: var(--color-text-muted);">
+                …o pega una captura con <kbd style="font-family: var(--font-mono);">Ctrl+V</kbd>, o arrástrala aquí
               </span>
             </div>
 
