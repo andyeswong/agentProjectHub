@@ -176,6 +176,37 @@ class AssetController extends Controller
         ]);
     }
 
+    // POST /api/v1/assets/{id}/palette — read the brand palette out of the pixels.
+    public function palette(Request $request, string $id, \App\Services\PaletteService $palettes): JsonResponse
+    {
+        $asset = $this->findScoped($request, $id);
+        if (! $asset) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+        if (! str_starts_with((string) $asset->mime_type, 'image/')) {
+            return response()->json(['error' => 'not_an_image'], 422);
+        }
+
+        $disk = \Illuminate\Support\Facades\Storage::disk($asset->storage_disk);
+        if (! $disk->exists($asset->storage_key)) {
+            return response()->json(['error' => 'file_missing'], 404);
+        }
+
+        try {
+            $result = $palettes->extract($disk->get($asset->storage_key));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => 'unreadable_image', 'hint' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            ...$result,
+            '_meta' => [
+                'method' => 'pixel quantization + role heuristics (no vision model)',
+                'hint'   => 'Hexes are bucket averages — snap them to your exact brand values. Fonts are NOT inferred: they cannot be read off pixels honestly.',
+            ],
+        ]);
+    }
+
     // DELETE /api/v1/assets/{id}
     public function destroy(Request $request, string $id): JsonResponse
     {

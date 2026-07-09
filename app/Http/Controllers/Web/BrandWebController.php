@@ -82,7 +82,26 @@ class BrandWebController extends Controller
         // Which assets are already linked (so the picker can mark them).
         $linked = $brand->assets()->pluck('assets.id')->all();
 
+        // ?palette_from=<assetId> — read a palette out of that image and offer
+        // it as a proposal. Nothing is saved until the pilot applies it.
+        $proposal = null;
+        if ($from = $request->query('palette_from')) {
+            $asset = Asset::whereIn('workspace_id', $wsIds)->find($from);
+            if ($asset && str_starts_with((string) $asset->mime_type, 'image/')) {
+                $disk = \Illuminate\Support\Facades\Storage::disk($asset->storage_disk);
+                if ($disk->exists($asset->storage_key)) {
+                    try {
+                        $proposal = app(\App\Services\PaletteService::class)->extract($disk->get($asset->storage_key));
+                        $proposal['asset'] = ['id' => $asset->id, 'filename' => $asset->filename];
+                    } catch (\InvalidArgumentException $e) {
+                        $proposal = ['error' => $e->getMessage()];
+                    }
+                }
+            }
+        }
+
         return Inertia::render('Brands/Show', [
+            'proposal' => $proposal,
             'brand'    => [
                 'id'         => $brand->id,
                 'slug'       => $brand->slug,

@@ -94,6 +94,7 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::post('/assets',                                        [AssetController::class, 'store']);
         Route::post('/assets/search',                                 [AssetController::class, 'search'])->middleware('throttle:sensitive');
         Route::get('/assets/{id}/raw',                                [AssetController::class, 'raw']);
+        Route::post('/assets/{id}/palette',                           [AssetController::class, 'palette']);
         Route::get('/assets/{id}',                                    [AssetController::class, 'show']);
         Route::delete('/assets/{id}',                                 [AssetController::class, 'destroy']);
 

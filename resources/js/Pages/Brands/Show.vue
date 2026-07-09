@@ -10,7 +10,7 @@ import UiRule from '@/Components/atoms/UiRule.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 
-const props = defineProps({ brand: Object, resolved: Object, library: Array, linked: Array })
+const props = defineProps({ brand: Object, resolved: Object, library: Array, linked: Array, proposal: Object })
 
 const ICONS = {
   copy:  'M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3',
@@ -68,6 +68,23 @@ function attach(assetId) {
 }
 function detach(assetId) {
   router.delete(`/brands/${props.brand.slug}/assets/${assetId}`, { preserveScroll: true })
+}
+
+// ── Extract palette from an image (F3) ───────────────────────────────────
+const extracting = ref(false)
+const images = computed(() => (props.library ?? []).filter(a => a.is_image))
+
+function extractFrom(assetId) {
+  router.get(`/brands/${props.brand.slug}`, { palette_from: assetId }, { preserveState: false, preserveScroll: true })
+}
+function clearProposal() {
+  router.get(`/brands/${props.brand.slug}`, {}, { preserveState: false, preserveScroll: true })
+}
+/** Merge the proposed roles into this brand's OWN colors and persist. */
+function applyProposal() {
+  const own = JSON.parse(JSON.stringify(props.brand?.tokens ?? {}))
+  own.colors = { ...(own.colors ?? {}), ...(props.proposal?.proposed ?? {}) }
+  router.patch(`/brands/${props.brand.slug}`, { tokens: own }, { preserveScroll: true })
 }
 
 // ── Edit tokens as JSON ──────────────────────────────────────────────────
@@ -226,6 +243,67 @@ function saveTokens() {
           </div>
         </div>
         <p v-else class="mt-2 text-sm" style="color: var(--color-text-muted);">Sin assets enlazados todavía.</p>
+      </section>
+
+      <!-- ── Extract palette from an image (F3) ── -->
+      <section class="mt-8">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <UiLabel>Extraer paleta de una imagen</UiLabel>
+            <p class="text-xs mt-1" style="color: var(--color-text-muted);">
+              Se leen los píxeles, no se le pregunta a un modelo. Los hex son promedios: ajústalos a tus valores exactos.
+            </p>
+          </div>
+          <UiButton variant="secondary" @click="extracting = !extracting">{{ extracting ? 'Cerrar' : 'Elegir imagen' }}</UiButton>
+        </div>
+
+        <UiCard v-if="extracting && !proposal" class="mt-3">
+          <div v-if="images.length" class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));">
+            <button v-for="a in images" :key="a.id" type="button" @click="extractFrom(a.id)"
+              class="text-left transition-opacity hover:opacity-80" style="border: 1px solid var(--color-surface-border);">
+              <div class="flex items-center justify-center overflow-hidden" style="aspect-ratio: 4/3; background-color: var(--color-surface-base);">
+                <img :src="a.web_url" class="w-full h-full object-contain" :alt="a.filename" loading="lazy" />
+              </div>
+              <p class="px-2 py-1 text-xs truncate" style="color: var(--color-text-primary);">{{ a.filename }}</p>
+            </button>
+          </div>
+          <p v-else class="text-sm" style="color: var(--color-text-muted);">No hay imágenes en la biblioteca.</p>
+        </UiCard>
+
+        <UiCard v-if="proposal" class="mt-3">
+          <p v-if="proposal.error" class="text-sm" style="color: var(--color-danger, #dc2626);">{{ proposal.error }}</p>
+          <template v-else>
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <p class="text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">
+                de {{ proposal.asset?.filename }} · {{ proposal.sampled?.toLocaleString() }} píxeles muestreados
+              </p>
+              <div class="flex items-center gap-2">
+                <UiButton variant="ghost" @click="clearProposal">Descartar</UiButton>
+                <UiButton @click="applyProposal">Aplicar a los tokens</UiButton>
+              </div>
+            </div>
+
+            <p class="mt-4 text-xs" style="color: var(--color-text-muted);">Roles propuestos</p>
+            <div class="mt-2 grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));">
+              <div v-for="(hex, role) in proposal.proposed" :key="role" style="border: 1px solid var(--color-surface-border);">
+                <div :style="{ backgroundColor: hex, height: '48px' }" />
+                <div class="px-2 py-1.5">
+                  <p class="text-xs truncate" style="color: var(--color-text-primary); font-family: var(--font-mono);">{{ role }}</p>
+                  <p class="text-[10px]" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ hex }}</p>
+                </div>
+              </div>
+            </div>
+
+            <p class="mt-4 text-xs" style="color: var(--color-text-muted);">Paleta completa (cobertura de la imagen)</p>
+            <div class="mt-2 flex items-stretch overflow-hidden" style="height: 34px; border: 1px solid var(--color-surface-border);">
+              <div v-for="p in proposal.palette" :key="p.hex" :title="`${p.hex} — ${(p.ratio * 100).toFixed(1)}%`"
+                :style="{ backgroundColor: p.hex, flexGrow: Math.max(p.ratio, 0.02) }" />
+            </div>
+            <p class="mt-2 text-xs" style="color: var(--color-text-muted);">
+              Las fuentes no se infieren: no se pueden leer de los píxeles con honestidad.
+            </p>
+          </template>
+        </UiCard>
       </section>
 
       <!-- ── Rules ── -->
