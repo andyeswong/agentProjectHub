@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\AgentWebController;
+use App\Http\Controllers\Web\AssetWebController;
 use App\Http\Controllers\Web\PersonalityWebController;
 use App\Http\Controllers\Web\SessionWebController;
 use App\Http\Controllers\Web\EventWebController;
@@ -60,6 +61,10 @@ Route::middleware('pilot.auth')->group(function () {
     Route::get('/sessions', [SessionWebController::class, 'index'])->name('sessions.index');
     Route::get('/events', [EventWebController::class, 'index'])->name('events.index');
     Route::get('/channels', [ChannelWebController::class, 'index'])->name('channels.index');
+    Route::get('/assets', [AssetWebController::class, 'index'])->name('assets.index');
+    Route::post('/assets', [AssetWebController::class, 'store'])->name('assets.store');
+    Route::get('/assets/{id}/raw', [AssetWebController::class, 'raw'])->name('assets.raw');
+    Route::delete('/assets/{id}', [AssetWebController::class, 'destroy'])->name('assets.destroy');
     Route::get('/memory', [MemoryWebController::class, 'index'])->name('memory.index');
     Route::get('/memory/{id}/reveal', [MemoryWebController::class, 'reveal'])->name('memory.reveal');
     Route::get('/memory/{id}', [MemoryWebController::class, 'show'])->name('memory.show');

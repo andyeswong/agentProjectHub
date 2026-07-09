@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AgentCommsController;
 use App\Http\Controllers\Api\V1\AgentLinkController;
 use App\Http\Controllers\Api\V1\AgentMessageController;
+use App\Http\Controllers\Api\V1\AssetController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CommentController;
 use App\Http\Controllers\Api\V1\EventController;
@@ -86,6 +87,14 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::post('/personalities/resolve',                         [PersonalityController::class, 'resolve']);
         Route::post('/personalities',                                 [PersonalityController::class, 'upsert']);
         Route::get('/personalities/{slug}',                           [PersonalityController::class, 'show']);
+
+        // Assets (F1) — independent binary store (logos, screenshots, refs)
+        Route::get('/assets',                                         [AssetController::class, 'index']);
+        Route::post('/assets',                                        [AssetController::class, 'store']);
+        Route::post('/assets/search',                                 [AssetController::class, 'search'])->middleware('throttle:sensitive');
+        Route::get('/assets/{id}/raw',                                [AssetController::class, 'raw']);
+        Route::get('/assets/{id}',                                    [AssetController::class, 'show']);
+        Route::delete('/assets/{id}',                                 [AssetController::class, 'destroy']);
 
         // Agent Channels — 1:1 real-time comms between agents (handshake + messaging)
         Route::prefix('agents')->group(function () {
