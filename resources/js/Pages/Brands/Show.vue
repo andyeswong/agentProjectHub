@@ -8,7 +8,7 @@ import UiBadge from '@/Components/atoms/UiBadge.vue'
 import UiIcon from '@/Components/atoms/UiIcon.vue'
 import UiRule from '@/Components/atoms/UiRule.vue'
 import { Link, router } from '@inertiajs/vue3'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   brand: Object, resolved: Object, library: Array, linked: Array,
@@ -32,6 +32,43 @@ const rules  = computed(() => props.resolved?.rules ?? [])
 const layers = computed(() => props.resolved?.layers ?? [])
 
 const fam = (v) => (typeof v === 'string' ? v : v?.family ?? '')
+
+/**
+ * Load the brand's webfonts so the specimens show the real typeface instead of
+ * a fallback. Only fires for tokens that declare where the font comes from —
+ * we never guess a provider, and a system font (ui-monospace) loads nothing.
+ */
+const fontHrefs = computed(() => {
+  const out = []
+  for (const v of Object.values(fonts.value)) {
+    if (typeof v === 'string' || !v?.family || !v?.source) continue
+    const weights = (v.weights ?? [400]).join(';')
+    if (v.source === 'google') {
+      out.push(`https://fonts.googleapis.com/css2?family=${v.family.replace(/ /g, '+')}:wght@${weights}&display=swap`)
+    } else if (v.source === 'fontshare') {
+      const slug = v.family.toLowerCase().replace(/ /g, '-')
+      out.push(`https://api.fontshare.com/v2/css?f[]=${slug}@${(v.weights ?? [400]).join(',')}&display=swap`)
+    }
+  }
+  return out
+})
+
+let injected = []
+function loadFonts() {
+  injected.forEach(el => el.remove())
+  injected = fontHrefs.value.map(href => {
+    const l = document.createElement('link')
+    l.rel = 'stylesheet'
+    l.href = href
+    document.head.appendChild(l)
+    return l
+  })
+}
+onMounted(loadFonts)
+onUnmounted(() => injected.forEach(el => el.remove()))
+
+/** Specimen copy: the brand's own name reads better than someone else's headline. */
+const specimen = computed(() => props.resolved?.name || props.brand?.slug || 'Tipografía')
 const logo = computed(() => assets.value.logo?.[0] ?? assets.value['logo-mark']?.[0] ?? null)
 const accent = computed(() => colors.value.accent ?? 'var(--color-accent)')
 const boardBg = computed(() => colors.value.bg ?? colors.value['bg-base'] ?? 'var(--color-surface-base)')
@@ -207,10 +244,18 @@ function saveTokens() {
           <UiCard v-for="(v, key) in fonts" :key="key">
             <div class="flex items-baseline justify-between gap-3 flex-wrap">
               <span class="text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ key }}</span>
-              <span class="text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">{{ fam(v) }}</span>
+              <span class="text-xs flex items-center gap-2" style="color: var(--color-text-muted); font-family: var(--font-mono);">
+                {{ fam(v) }}
+                <span v-if="v?.source" style="opacity: .6;">· {{ v.source }}</span>
+                <span v-else-if="typeof v === 'string'" style="opacity: .6;">· sistema</span>
+              </span>
             </div>
-            <p class="mt-2 truncate" :style="{ fontFamily: fam(v), fontSize: key === 'display' ? '2rem' : '1.1rem', color: 'var(--color-text-primary)' }">
-              Alianza de Líderes en Tecnología
+            <p class="mt-2 truncate"
+              :style="{ fontFamily: fam(v), fontSize: key === 'display' ? '2rem' : '1.1rem',
+                        fontWeight: key === 'display' ? (v?.weights?.[0] ?? 500) : 400,
+                        letterSpacing: key === 'display' ? (tokens.type?.h1?.tracking ?? 'normal') : 'normal',
+                        color: 'var(--color-text-primary)' }">
+              {{ specimen }}
             </p>
           </UiCard>
         </div>
