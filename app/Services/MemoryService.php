@@ -72,6 +72,25 @@ class MemoryService
         $embedding      = $contentChanged ? $this->embedder->embed($this->buildEmbedText($data)) : $existing->embedding;
         $embeddingModel = $embedding ? $this->embedder->model() : ($existing->embedding_model ?? null);
 
+        $content = $data['content'] ?? ($existing->content ?? '');
+
+        // store() materializes [[wikilinks]] into association edges; this path
+        // used to skip it, so a memory saved by key silently lost its graph —
+        // and a link to a memory that did not exist yet could never be picked
+        // up on a later save. Recompute them here.
+        //
+        // Hand-authored edges survive; the wikilink edges are rebuilt from the
+        // current prose, so a link removed from the text stops firing.
+        $manualEdges = collect($existing->associations ?? [])
+            ->reject(fn ($a) => ($a['via'] ?? null) === 'wikilink')
+            ->values()->all();
+
+        $associations = $this->mergeAssociations(
+            $data['associations'] ?? null,
+            $manualEdges,
+            $this->wikilinkEdges($content, $workspaceId, $existing?->id),
+        );
+
         $attributes = [
             'workspace_id'    => $workspaceId,
             'created_by'      => $existing ? $existing->created_by : $actor->id,
@@ -79,9 +98,10 @@ class MemoryService
             'memory_key'      => $key,
             'type'            => $data['type']        ?? ($existing->type         ?? 'fact'),
             'label'           => $data['label']       ?? ($existing->label        ?? $key),
-            'content'         => $data['content']     ?? ($existing->content      ?? ''),
+            'content'         => $content,
             'value'           => $data['value']       ?? ($existing->value        ?? null),
             'tags'            => $data['tags']        ?? ($existing->tags         ?? null),
+            'associations'    => $associations,
             'is_sensitive'    => $data['is_sensitive'] ?? ($existing->is_sensitive ?? false),
             'embedding'       => $embedding,
             'embedding_model' => $embeddingModel,
