@@ -105,6 +105,7 @@ Route::middleware('api.auth')->prefix('v1')->group(function () {
         Route::post('/brands/{id}/assets',                            [BrandController::class, 'attachAsset']);
         Route::delete('/brands/{brandId}/assets/{assetId}',           [BrandController::class, 'detachAsset']);
         Route::get('/brands/{slug}',                                  [BrandController::class, 'show']);
+        Route::delete('/brands/{slug}',                               [BrandController::class, 'destroy']);
 
         // Agent Channels — 1:1 real-time comms between agents (handshake + messaging)
         Route::prefix('agents')->group(function () {

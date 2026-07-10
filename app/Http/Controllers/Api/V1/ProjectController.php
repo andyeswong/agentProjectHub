@@ -118,7 +118,25 @@ class ProjectController extends Controller
             'name'        => 'sometimes|string|max:255',
             'description' => 'sometimes|nullable|string',
             'status'      => 'sometimes|in:active,archived',
+            'brand_id'    => 'sometimes|nullable|uuid',   // null clears the pointer
         ]);
+
+        // Point the project at a brand so brand_resolve(project_id) returns it
+        // instead of falling back to the workspace default. The brand must live
+        // in this org.
+        if (! empty($data['brand_id'])) {
+            $orgWorkspaceIds = Workspace::where('org_id', $apiKey->org_id)->pluck('id');
+            $brandInOrg = \App\Models\Brand::whereIn('workspace_id', $orgWorkspaceIds)
+                ->where('id', $data['brand_id'])
+                ->exists();
+
+            if (! $brandInOrg) {
+                return response()->json([
+                    'error' => 'brand_not_found',
+                    'hint'  => 'That brand is not in your org. List them with brand_list.',
+                ], 422);
+            }
+        }
 
         $project->update($data);
 

@@ -183,6 +183,29 @@ class BrandController extends Controller
         return response()->json(['status' => 'detached']);
     }
 
+    // DELETE /api/v1/brands/{slug}
+    public function destroy(Request $request, string $slug): JsonResponse
+    {
+        $brand = Brand::whereIn('workspace_id', $this->orgWorkspaceIds($request->attributes->get('api_key')))
+            ->where('slug', $slug)
+            ->first();
+
+        if (! $brand) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        $promoted = $this->brands->delete($brand);
+
+        return response()->json([
+            'status'           => 'deleted',
+            'slug'             => $slug,
+            'children_promoted' => $promoted,
+            '_meta'            => [
+                'hint' => 'Linked assets were NOT deleted — only the links. Child brands became roots.',
+            ],
+        ]);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private function orgWorkspaceIds($apiKey): array

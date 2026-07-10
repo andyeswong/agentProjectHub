@@ -258,4 +258,26 @@ class BrandService
     {
         $brand->assets()->detach($asset->id);
     }
+
+    /**
+     * Delete a brand. Its asset links go with it (pivot cascade) but the assets
+     * themselves live on — that is the F1/F2 contract.
+     *
+     * brands.parent_id carries no foreign key, so children would be left
+     * pointing at a ghost and resolve() would silently drop their inherited
+     * layer. Promote them to roots first.
+     *
+     * @return int how many children were promoted
+     */
+    public function delete(Brand $brand): int
+    {
+        $orphans = Brand::where('parent_id', $brand->id)->update(['parent_id' => null]);
+
+        // Projects pointing here lose the pointer and fall back to the default.
+        Project::where('brand_id', $brand->id)->update(['brand_id' => null]);
+
+        $brand->delete();
+
+        return $orphans;
+    }
 }
