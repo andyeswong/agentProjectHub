@@ -34,6 +34,14 @@ const layers = computed(() => props.resolved?.layers ?? [])
 const fam = (v) => (typeof v === 'string' ? v : v?.family ?? '')
 
 /**
+ * The panel squares every corner with `* { border-radius: 0 !important }`.
+ * That is ProjectHub's own look, but the component preview exists to show the
+ * BRAND's shapes, so it has to opt out. An important inline declaration wins
+ * over an important one from a stylesheet.
+ */
+const radius = (v) => `${v ?? '999px'} !important`
+
+/**
  * Load the brand's webfonts so the specimens show the real typeface instead of
  * a fallback. Only fires for tokens that declare where the font comes from —
  * we never guess a provider, and a system font (ui-monospace) loads nothing.
@@ -275,18 +283,25 @@ function saveTokens() {
         <div class="mt-3 p-6 flex items-center gap-3 flex-wrap"
           :style="{ backgroundColor: boardBg, border: '1px solid var(--color-surface-border)' }">
           <button type="button"
-            :style="{ backgroundColor: accent, color: colors['accent-ink'] || '#fff', borderRadius: radii.pill || '999px',
+            :style="{ backgroundColor: accent, color: colors['accent-ink'] || '#fff', borderRadius: radius(radii.pill),
                       padding: '12px 24px', fontFamily: fam(fonts.body) || 'inherit', fontWeight: 600, border: 'none' }">
             Botón primario
           </button>
           <button type="button"
             :style="{ background: 'transparent', color: boardFg, border: `1px solid ${colors.border || 'rgba(255,255,255,.2)'}`,
-                      borderRadius: radii.pill || '999px', padding: '12px 24px', fontFamily: fam(fonts.body) || 'inherit' }">
+                      borderRadius: radius(radii.pill), padding: '12px 24px', fontFamily: fam(fonts.body) || 'inherit' }">
             Ghost
           </button>
           <span v-for="c in ['Networking', 'Tecnología']" :key="c"
             :style="{ border: `1px solid ${colors.border || 'rgba(255,255,255,.2)'}`, color: boardFg,
-                      borderRadius: radii.pill || '999px', padding: '6px 14px', fontSize: '.8rem' }">{{ c }}</span>
+                      borderRadius: radius(radii.pill), padding: '6px 14px', fontSize: '.8rem' }">{{ c }}</span>
+          <div
+            :style="{ backgroundColor: colors['frame-bg'] || colors.surface || 'transparent', color: boardFg,
+                      border: `1px solid ${colors.border || 'rgba(255,255,255,.2)'}`,
+                      borderRadius: radius(radii.lg || radii.md), padding: '14px 18px', fontSize: '.85rem',
+                      fontFamily: fam(fonts.body) || 'inherit' }">
+            Tarjeta · radius {{ radii.lg || radii.md || '—' }}
+          </div>
         </div>
       </section>
 
