@@ -42,6 +42,14 @@ const fontHrefs = computed(() => {
   const out = []
   for (const v of Object.values(fonts.value)) {
     if (typeof v === 'string' || !v?.family || !v?.source) continue
+
+    // An explicit stylesheet wins: a face may live on a CDN or on our own
+    // server, and no amount of guessing finds it. `href` is how the token says
+    // where. Anything else must name a provider we know how to address.
+    if (v.href) {
+      out.push(v.href)
+      continue
+    }
     const weights = (v.weights ?? [400]).join(';')
     if (v.source === 'google') {
       out.push(`https://fonts.googleapis.com/css2?family=${v.family.replace(/ /g, '+')}:wght@${weights}&display=swap`)
