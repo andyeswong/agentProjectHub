@@ -234,8 +234,15 @@ class MemoryController extends Controller
 
         $mem = AgentMemory::whereIn('workspace_id', $workspaceIds)->findOrFail($id);
 
+        // Accept `memory_key` as an alias of `key` (the error hints emitted below
+        // reference `memory_key`, and clients follow them verbatim).
+        if ($request->has('memory_key') && !$request->has('key')) {
+            $request->merge(['key' => $request->input('memory_key')]);
+        }
+
         $data = $request->validate([
             'workspace_id' => 'sometimes|uuid',
+            'key'          => 'sometimes|nullable|string|max:255',
             'type'         => 'sometimes|in:credential,domain,ip,fact,config,note,skill,other',
             'label'        => 'sometimes|string|max:255',
             'content'      => 'sometimes|string',
@@ -245,6 +252,41 @@ class MemoryController extends Controller
             'is_sensitive' => 'sometimes|boolean',
             'expires_at'   => 'sometimes|nullable|date',
         ]);
+
+        // `key` is the public field name; the column is `memory_key`.
+        // Assigning a key to a memory that never had one is the main use case:
+        // memories created without a key are unreachable by GET /memory?key= and
+        // by memory_list(key=...), and other memories already cite them by the
+        // key they were expected to have.
+        if (array_key_exists('key', $data)) {
+            $newKey = $data['key'] !== null && $data['key'] !== ''
+                ? $data['key']
+                : null;
+            unset($data['key']);
+
+            if ($newKey !== $mem->memory_key) {
+                if ($newKey !== null) {
+                    $targetWorkspaceId = $data['workspace_id'] ?? $mem->workspace_id;
+
+                    $conflicting = AgentMemory::where('workspace_id', $targetWorkspaceId)
+                        ->where('memory_key', $newKey)
+                        ->where('id', '!=', $mem->id)
+                        ->first();
+
+                    if ($conflicting) {
+                        return response()->json([
+                            'error' => "A memory with key \"{$newKey}\" already exists in this workspace.",
+                            'code'  => 'memory_key_conflict',
+                            'conflicting_memory' => $conflicting->toPublicArray(),
+                            'hint'  => 'Pick a different key, or clear the key on the conflicting memory first '
+                                     . '(PUT /api/v1/memory/{id} with {"key": null}).',
+                        ], 409);
+                    }
+                }
+
+                $data['memory_key'] = $newKey;
+            }
+        }
 
         // Validate workspace_id belongs to the same org
         if (!empty($data['workspace_id'])) {
