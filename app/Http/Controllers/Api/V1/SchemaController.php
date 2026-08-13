@@ -392,9 +392,12 @@ class SchemaController extends Controller
                     'method'  => 'PUT',
                     'path'    => '/api/v1/memory/{id}',
                     'auth'    => true,
-                    'summary' => 'Update a memory by ID. Re-embeds automatically if content changes.',
+                    'summary' => 'Update a memory by ID. Re-embeds automatically if content changes. '
+                               . 'Use `key` to assign, change or clear the named key of an EXISTING memory '
+                               . '(pass null to clear) — this is the only way to give a key to a memory that was created without one.',
                     'path_params' => ['id' => 'Memory UUID'],
                     'body'    => [
+                        'key'          => ['type' => 'string',  'required' => false, 'description' => 'Named key, unique within the workspace. Pass null to clear. Alias: memory_key. Returns 409 memory_key_conflict if taken.'],
                         'label'        => ['type' => 'string',  'required' => false],
                         'content'      => ['type' => 'string',  'required' => false],
                         'type'         => ['type' => 'string',  'required' => false],
